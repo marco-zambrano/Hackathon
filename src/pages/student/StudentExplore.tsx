@@ -12,7 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Calendar, BookOpen } from "lucide-react";
+import { Search, Calendar, BookOpen, Users, Loader2 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { supabase } from "@/backend/supabase-client";
 import type { Course, Profile } from "@/types/database";
@@ -131,86 +131,134 @@ const StudentExplore = () => {
 
   return (
     <DashboardLayout role={role}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Explorar Cursos</h1>
-          <p className="text-muted-foreground mt-2">
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold">Explorar Cursos</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
             Descubre y aplica a nuevos cursos disponibles
           </p>
         </div>
 
         {/* Search Bar */}
-        <div className="relative">
-          <Search className="absolute left-3 top-3 h-5 w-5 text-muted-foreground" />
+        <div className="relative max-w-2xl">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
           <Input
             placeholder="Buscar cursos por nombre, profesor o habilidades..."
-            className="pl-10 h-12"
+            className="pl-9 h-10 md:h-12 text-sm md:text-base"
           />
         </div>
 
         {/* Courses Grid */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {availableCourses.map((course) => {
             const professorName = course.professor
               ? `${course.professor.first_name ?? ""} ${course.professor.last_name ?? ""}`.trim()
               : "Profesor asignado";
             const enrolledLabel = "--";
+            const startDate = course.start_date 
+              ? new Date(course.start_date).toLocaleDateString('es-ES', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })
+              : 'Por definir';
+            const endDate = course.end_date 
+              ? new Date(course.end_date).toLocaleDateString('es-ES', {
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric'
+                })
+              : 'Por definir';
 
             return (
-            <Card
-              key={course.id}
-              className="flex flex-col hover:shadow-lg transition-shadow"
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between mb-2">
-                  <Badge variant="secondary">{course.status}</Badge>
-                  <div className="text-xs text-muted-foreground">
+              <Card
+                key={course.id}
+                className="flex flex-col hover:shadow-lg transition-shadow h-full flex-1 min-w-0"
+              >
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between mb-2">
+                    <Badge 
+                      variant={course.status === 'ACTIVE' ? 'default' : 'secondary'}
+                      className="capitalize"
+                    >
+                      {course.status?.toLowerCase() === 'active' ? 'Disponible' : course.status?.toLowerCase()}
+                    </Badge>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      <Users className="h-3 w-3 mr-1" />
                       {enrolledLabel}/{course.max_students ?? "--"}
+                    </div>
                   </div>
-                </div>
-                <CardTitle className="text-lg">{course.title}</CardTitle>
-                  <CardDescription>{professorName}</CardDescription>
-              </CardHeader>
+                  <CardTitle className="text-lg line-clamp-2">{course.title}</CardTitle>
+                  <CardDescription className="line-clamp-1">{professorName}</CardDescription>
+                </CardHeader>
 
-              <CardContent className="flex-1 space-y-4">
-                <p className="text-sm text-muted-foreground line-clamp-2">
-                  {course.description}
-                </p>
+                <CardContent className="flex-1 space-y-4 pb-4">
+                  <p className="text-sm text-muted-foreground line-clamp-3">
+                    {course.description || 'Sin descripción disponible'}
+                  </p>
 
-                {/* Course Dates */}
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                      <span>Inicio: {course.start_date ?? "Por definir"}</span>
+                  {/* Course Dates */}
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
+                      <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div>
+                        <p className="text-muted-foreground text-xs">Inicio</p>
+                        <p className="font-medium">{startDate}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
+                      <Calendar className="h-4 w-4 shrink-0 text-muted-foreground" />
+                      <div>
+                        <p className="text-muted-foreground text-xs">Fin</p>
+                        <p className="font-medium">{endDate}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                      <span>Fin: {course.end_date ?? "Por definir"}</span>
-                  </div>
-                </div>
 
-                {/* Skills */}
-                <div className="flex flex-wrap gap-2">
-                    {(course.skills ?? []).map((skill) => (
-                      <Badge key={skill} variant="outline" className="text-xs">
-                        {skill}
-                      </Badge>
-                    ))}
-                </div>
-              </CardContent>
+                  {/* Skills */}
+                  {(course.skills?.length ?? 0) > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">Habilidades:</p>
+                      <div className="flex flex-wrap gap-2">
+                        {(course.skills ?? []).map((skill) => (
+                          <Badge 
+                            key={skill} 
+                            variant="outline" 
+                            className="text-xs font-normal"
+                          >
+                            {skill}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
 
-              <CardFooter>
-                <Button 
+              <CardFooter className="pt-0">
+                <Button
                   className="w-full"
                   onClick={() => handleEnrollRequest(course.id)}
-                  disabled={loading[course.id] || course.status === 'PENDING'}
+                  disabled={course.status === 'PENDING' || loading[course.id]}
+                  size={window.innerWidth < 640 ? 'sm' : 'default'}
                 >
-                  <BookOpen className="h-4 w-4 mr-2" />
-                  {loading[course.id] 
-                    ? 'Enviando...' 
-                    : course.status === 'PENDING'
-                      ? 'Solicitud Enviada'
-                      : 'Solicitar Inscripción'}
+                  {loading[course.id] ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      <span className="hidden sm:inline">Procesando</span>
+                    </>
+                  ) : course.status === 'PENDING' ? (
+                    <span className="flex items-center">
+                      <Loader2 className="h-4 w-4 mr-1.5 animate-spin" />
+                      <span className="hidden sm:inline">Solicitud Enviada</span>
+                      <span className="sm:hidden">Enviada</span>
+                    </span>
+                  ) : (
+                    <span className="flex items-center">
+                      <BookOpen className="h-4 w-4 mr-1.5" />
+                      <span className="hidden sm:inline">Solicitar Inscripción</span>
+                      <span className="sm:hidden">Inscribirse</span>
+                    </span>
+                  )}
                 </Button>
               </CardFooter>
             </Card>

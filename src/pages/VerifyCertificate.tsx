@@ -1,4 +1,6 @@
 import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
+import { supabase } from "@/backend/supabase-client";
 import {
   Card,
   CardContent,
@@ -6,19 +8,75 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search } from "lucide-react";
+import { Search, CheckCircle, XCircle, Loader2 } from "lucide-react";
+
+type Certificate = {
+  id: string;
+  student_name: string;
+  student_last_name: string;
+  course_title: string;
+  issue_date: string;
+  status: 'pending' | 'approved' | 'rejected';
+  verification_code: string;
+};
 
 const VerifyCertificate = () => {
-  const [verificationCode, setVerificationCode] = useState("");
-  const [textToVerify, setTextToVerify] = useState("");
-  const [activeTab, setActiveTab] = useState("code");
+  const [searchParams] = useSearchParams();
+  const [verificationCode, setVerificationCode] = useState(
+    searchParams.get('code') || ''
+  );
+  const [loading, setLoading] = useState(false);
+  const [certificate, setCertificate] = useState<Certificate | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const handleVerify = () => {
-    // Verification logic will go here
-    console.log("Verifying...", { verificationCode, textToVerify });
+  const handleVerify = async () => {
+    if (!verificationCode.trim()) {
+      setError('Por favor ingresa un código de verificación');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const { data, error: fetchError } = await supabase
+        .from('certificates')
+        .select(`
+          id,
+          verification_code,
+          status,
+          issue_date,
+          profiles:student_id (first_name, last_name),
+          courses (title)
+        `)
+        .eq('verification_code', verificationCode.trim())
+        .single();
+
+      if (fetchError) throw fetchError;
+      if (!data) {
+        throw new Error('No se encontró ningún certificado con este código');
+      }
+
+      const profile = data.profiles?.[0] || { first_name: null, last_name: null };
+      const course = data.courses?.[0] || { title: null };
+
+      setCertificate({
+        id: data.id,
+        student_name: profile.first_name || 'N/A',
+        student_last_name: profile.last_name || 'N/A',
+        course_title: course.title || 'Curso no disponible',
+        issue_date: new Date(data.issue_date).toLocaleDateString(),
+        status: data.status || 'pending',
+        verification_code: data.verification_code,
+      });
+    } catch (err: any) {
+      setError(err.message || 'Error al verificar el certificado');
+      setCertificate(null);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -33,85 +91,106 @@ const VerifyCertificate = () => {
 
         <Card className="w-full">
           <CardHeader>
-            <CardTitle>Método de Verificación</CardTitle>
+            <CardTitle>Verificar por Código</CardTitle>
             <CardDescription>
-              Selecciona cómo deseas verificar el certificado
+              Ingresa el código de verificación del certificado
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Tabs
-              value={activeTab}
-              onValueChange={setActiveTab}
-              className="w-full"
-            >
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="code">Por Código</TabsTrigger>
-                <TabsTrigger value="text">Por Texto</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="code" className="mt-6">
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="verificationCode"
-                      className="block text-sm font-medium mb-2"
-                    >
-                      Código de Verificación
-                    </label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="verificationCode"
-                        type="text"
-                        placeholder="Ingresa el código del certificado"
-                        className="pl-10"
-                        value={verificationCode}
-                        onChange={(e) => setVerificationCode(e.target.value)}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2">
-                      El código se encuentra en la parte inferior del
-                      certificado
-                    </p>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <TabsContent value="text" className="mt-6">
-                <div className="space-y-4">
-                  <div>
-                    <label
-                      htmlFor="textToVerify"
-                      className="block text-sm font-medium mb-2"
-                    >
-                      Texto a Verificar
-                    </label>
-                    <div className="relative">
-                      <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <textarea
-                        id="textToVerify"
-                        placeholder="Pega el texto del certificado que deseas verificar"
-                        className="flex min-h-[100px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 pl-10"
-                        value={textToVerify}
-                        onChange={(e) => setTextToVerify(e.target.value)}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </TabsContent>
-
-              <div className="mt-6">
-                <Button className="w-full" size="lg" onClick={handleVerify}>
-                  Verificar Certificado
+            <div className="flex flex-col space-y-4">
+              <div className="flex space-x-2">
+                <Input
+                  placeholder="Código de verificación"
+                  value={verificationCode}
+                  onChange={(e) => setVerificationCode(e.target.value)}
+                  className="flex-1"
+                  onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
+                />
+                <Button 
+                  onClick={handleVerify}
+                  disabled={loading || !verificationCode.trim()}
+                >
+                  {loading ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verificando...
+                    </>
+                  ) : (
+                    <>
+                      <Search className="mr-2 h-4 w-4" />
+                      Verificar
+                    </>
+                  )}
                 </Button>
               </div>
-            </Tabs>
+
+              {error && (
+                <div className="text-sm text-red-500 flex items-center">
+                  <XCircle className="h-4 w-4 mr-2" />
+                  {error}
+                </div>
+              )}
+
+              {certificate && (
+                <Card className="mt-6 border-green-200 bg-green-50">
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-green-800">
+                        Certificado Válido
+                      </CardTitle>
+                      <CheckCircle className="h-6 w-6 text-green-600" />
+                    </div>
+                    <CardDescription>
+                      Los detalles del certificado se muestran a continuación
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <p className="text-sm text-muted-foreground">Estudiante</p>
+                        <p className="font-medium">
+                          {certificate.student_name} {certificate.student_last_name}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Curso</p>
+                        <p className="font-medium">{certificate.course_title}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Fecha de Emisión</p>
+                        <p className="font-medium">{certificate.issue_date}</p>
+                      </div>
+                      <div>
+                        <p className="text-sm text-muted-foreground">Estado</p>
+                        <p className="font-medium">
+                          {certificate.status === 'approved' ? (
+                            <span className="text-green-600">Aprobado</span>
+                          ) : certificate.status === 'rejected' ? (
+                            <span className="text-red-600">Rechazado</span>
+                          ) : (
+                            <span className="text-amber-600">Pendiente</span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="col-span-2">
+                        <p className="text-sm text-muted-foreground">Código de Verificación</p>
+                        <p className="font-mono font-medium bg-gray-100 p-2 rounded-md">
+                          {certificate.verification_code}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+            
+            <div className="mt-6 text-center">
+              <p className="text-sm text-muted-foreground">
+                ¿Problemas para verificar? Contacta al soporte técnico
+              </p>
+            </div>
           </CardContent>
         </Card>
-
-        <div className="mt-6 text-center text-sm text-muted-foreground">
-          <p>¿Problemas para verificar? Contacta al soporte técnico</p>
-        </div>
       </div>
     </div>
   );

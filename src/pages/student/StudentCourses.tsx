@@ -102,16 +102,16 @@ const StudentCourses = () => {
 
   return (
     <DashboardLayout role={role}>
-      <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold">Mis Cursos</h1>
-          <p className="text-muted-foreground mt-2">
+      <div className="space-y-6 p-4 md:p-6">
+        <div className="space-y-2">
+          <h1 className="text-2xl md:text-3xl font-bold">Mis Cursos</h1>
+          <p className="text-muted-foreground text-sm md:text-base">
             Cursos en los que estás inscrito y has completado
           </p>
         </div>
 
         {enrolledCourses.length > 0 ? (
-          <div className="grid md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 gap-4 sm:gap-6">
             {enrolledCourses.map((enrollment) => {
               const course = enrollment.courses;
               const professor = course.professor;
@@ -119,27 +119,43 @@ const StudentCourses = () => {
                 ? `${professor.first_name} ${professor.last_name}` 
                 : 'Profesor no asignado';
               const progress = enrollment.status === 'COMPLETED' ? 100 : 50;
+              const startDate = enrollment.created_at 
+                ? new Date(enrollment.created_at).toLocaleDateString('es-ES', {
+                    day: 'numeric',
+                    month: 'short',
+                    year: 'numeric'
+                  })
+                : 'Sin fecha';
 
               return (
-                <Card key={enrollment.id} className="hover:shadow-lg transition-shadow">
-                  <CardHeader>
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1">
-                        <CardTitle className="text-xl">{course.title}</CardTitle>
-                        <CardDescription>{professorName}</CardDescription>
+                <Card key={enrollment.id} className="hover:shadow-lg transition-shadow overflow-hidden">
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+                      <div className="space-y-1 flex-1">
+                        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                          <CardTitle className="text-lg sm:text-xl line-clamp-2">{course.title}</CardTitle>
+                          <div className="flex items-center gap-2">
+                            <Badge
+                              variant={
+                                enrollment.status === "COMPLETED" ? "default" : "secondary"
+                              }
+                              className="whitespace-nowrap"
+                            >
+                              {enrollment.status === "COMPLETED" ? "Completado" : "En progreso"}
+                            </Badge>
+                            <Badge variant="outline" className="hidden sm:inline-flex">
+                              {course.status === "ACTIVE" ? "Activo" : "Pendiente"}
+                            </Badge>
+                          </div>
+                        </div>
+                        <CardDescription className="line-clamp-1">{professorName}</CardDescription>
                       </div>
-                      <Badge
-                        variant={
-                          enrollment.status === "COMPLETED" ? "default" : "secondary"
-                        }
-                      >
-                        {enrollment.status === "COMPLETED" ? "Completado" : "En progreso"}
-                      </Badge>
                     </div>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  
+                  <CardContent className="pt-0 pb-4">
                     {/* Progress Bar */}
-                    <div className="space-y-2">
+                    <div className="space-y-2 mb-4">
                       <div className="flex justify-between text-sm">
                         <span className="text-muted-foreground">Progreso</span>
                         <span className="font-medium">{progress}%</span>
@@ -153,40 +169,54 @@ const StudentCourses = () => {
                     </div>
 
                     {/* Course Info */}
-                    <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="h-4 w-4" />
-                        <span>
-                          {new Date(enrollment.created_at || '').toLocaleDateString('es-ES', {
-                            day: 'numeric',
-                            month: 'short',
-                            year: 'numeric'
-                          })}
-                        </span>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
+                        <Clock className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div>
+                          <p className="text-muted-foreground text-xs">Inscrito</p>
+                          <p className="font-medium">{startDate}</p>
+                        </div>
                       </div>
-                      <Badge variant="outline">
-                        {course.status === "ACTIVE" ? "Activo" : "Pendiente"}
-                      </Badge>
+                      
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
+                        <Users className="h-4 w-4 shrink-0 text-muted-foreground" />
+                        <div>
+                          <p className="text-muted-foreground text-xs">Estado</p>
+                          <p className="font-medium">
+                            {course.status === "ACTIVE" ? "Activo" : "Pendiente"}
+                          </p>
+                        </div>
+                      </div>
                     </div>
 
-                    {/* Description */}
-                    <p className="text-sm text-muted-foreground line-clamp-2">
-                      {course.description}
-                    </p>
+                    {/* Description - Show on larger screens */}
+                    {course.description && (
+                      <p className="text-sm text-muted-foreground mt-4 hidden sm:block">
+                        {course.description}
+                      </p>
+                    )}
                   </CardContent>
                 </Card>
               );
             })}
           </div>
         ) : (
-          <Card className="p-12 text-center">
-            <BookOpen className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+          <Card className="p-8 sm:p-12 text-center">
+            <BookOpen className="h-10 w-10 sm:h-12 sm:w-12 text-muted-foreground mx-auto mb-4" />
             <h3 className="text-lg font-semibold mb-2">
               No hay cursos inscritos
             </h3>
-            <p className="text-muted-foreground">
+            <p className="text-muted-foreground text-sm sm:text-base">
               Explora cursos disponibles para comenzar tu aprendizaje
             </p>
+            <div className="mt-6">
+              <a
+                href="/student/explore"
+                className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+              >
+                Explorar Cursos
+              </a>
+            </div>
           </Card>
         )}
       </div>

@@ -100,7 +100,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
     { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { title: "Usuarios", href: "/admin/users", icon: Users },
     { title: "Cursos", href: "/admin/courses", icon: BookMarked },
-    { title: "Verificar Certificado", href: "/verify-certificate", icon: Award },
+    { title: "Verificar Certificado", href: "/admin/certificates", icon: Award },
   ];
 
   const navItems =
@@ -112,11 +112,19 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
 
   return (
     <div className="flex min-h-screen w-full bg-background relative">
-      {/* Mobile menu button */}
+      {/* Mobile menu button with overlay */}
+      {isMobile && sidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-30"
+          onClick={() => setSidebarOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+      
       <button
         onClick={() => setSidebarOpen(!sidebarOpen)}
-        className="fixed top-4 left-4 z-50 p-2 rounded-md md:hidden bg-sidebar text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
-        aria-label="Toggle menu"
+        className="fixed top-4 left-4 z-40 p-2 rounded-md md:hidden bg-sidebar text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors shadow-lg"
+        aria-label={sidebarOpen ? "Cerrar menú" : "Abrir menú"}
       >
         {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
       </button>
@@ -124,8 +132,10 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
       {/* Sidebar */}
       <aside 
         className={cn(
-          "fixed md:static inset-y-0 left-0 z-40 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transform transition-transform duration-300 ease-in-out",
-          isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0',
+          "fixed md:static inset-y-0 left-0 z-40 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transform transition-transform duration-300 ease-in-out shadow-lg md:shadow-none sidebar-transition",
+          isMobile 
+            ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full')
+            : 'translate-x-0',
           "md:translate-x-0" // Always show on desktop
         )}
       >
@@ -191,27 +201,39 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
             <LogOut className="h-4 w-4 mr-2" />
             Cerrar Sesión
           </Button>
-          <Button 
-            asChild
-            variant="outline"
-            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 border-sidebar-border/50"
-          >
-            <Link to="/verify" target="_blank" rel="noopener noreferrer">
-              <Award className="h-4 w-4 mr-2" />
-              Verificar Certificado
-            </Link>
-          </Button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto transition-all duration-300">
-        <div className="container mx-auto p-4 md:p-6 lg:p-8">
-          {isMobile && (
-            <div className="h-16"></div>
-          )}
+      <main className="flex-1 flex flex-col overflow-hidden pt-16 md:pt-0">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
           {children}
         </div>
+        
+        {/* Mobile navigation for bottom bar */}
+        {isMobile && (
+          <div className="md:hidden fixed bottom-0 left-0 right-0 bg-card border-t border-border flex justify-around items-center p-2 z-30">
+            {navItems.slice(0, 4).map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={cn(
+                    "flex flex-col items-center justify-center p-2 rounded-lg w-full mx-1 transition-colors",
+                    isActive
+                      ? "bg-primary/10 text-primary"
+                      : "text-muted-foreground hover:bg-muted/50"
+                  )}
+                  onClick={() => setSidebarOpen(false)}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span className="text-xs mt-1">{item.title}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </main>
     </div>
   );

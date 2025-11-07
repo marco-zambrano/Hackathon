@@ -15,6 +15,7 @@ import StudentProfile from "./pages/student/StudentProfile";
 import AdminDashboard from "./pages/admin/AdminDashboard";
 import AdminUsers from "./pages/admin/AdminUsers";
 import AdminCourses from "./pages/admin/AdminCourses";
+import AdminCertificates from "./pages/admin/AdminCertificates";
 import NotFound from "./pages/NotFound";
 import ProfessorRequests from "./pages/professor/ProfessorRequests";
 import ProfessorCourses from "./pages/professor/ProfessorCourses";
@@ -39,7 +40,7 @@ const App = () => (
           {/* Públicas - Accesibles para todos */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/verify" element={<VerifyCertificate />} />
+          <Route path="/verify-certificate" element={<VerifyCertificate />} />
           
           {/* Student Routes - Solo STUDENT */}
           <Route 
@@ -139,6 +140,14 @@ const App = () => (
             element={
               <ProtectedRoute allowedRoles={['ADMIN']}>
                 <AdminCourses />
+              </ProtectedRoute>
+            } 
+          />
+          <Route 
+            path="/admin/certificates" 
+            element={
+              <ProtectedRoute allowedRoles={['ADMIN']}>
+                <AdminCertificates />
               </ProtectedRoute>
             } 
           />
