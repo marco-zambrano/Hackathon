@@ -97,7 +97,7 @@ const AdminCourses = () => {
   return (
     <DashboardLayout role="admin">
       <div className="space-y-6">
-        <div className="bg-gradient-to-r from-primary/5 to-primary/10 p-6 rounded-lg border border-border">
+        <div className="bg-linear-to-r from-primary/5 to-primary/10 p-6 rounded-lg border border-border">
           <h1 className="text-3xl font-bold text-foreground">Gestión de Cursos</h1>
           <p className="text-muted-foreground mt-1">
             Administra y visualiza todos los cursos del sistema

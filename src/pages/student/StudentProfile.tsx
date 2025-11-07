@@ -70,7 +70,7 @@ const StudentProfile = () => {
           <CardContent className="space-y-6 p-4 sm:p-6 pt-0">
             {/* Avatar Upload */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 pt-2">
-              <div className="flex-shrink-0">
+              <div className="shrink-0">
                 <Avatar className="h-16 w-16 sm:h-20 sm:w-20">
                   <AvatarImage src={profile?.avatar_url || ''} alt={profile?.first_name} />
                   <AvatarFallback>
