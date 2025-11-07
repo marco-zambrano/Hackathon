@@ -9,8 +9,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Award, Download, Share2, QrCode } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 const StudentCertificates = () => {
+  const location = useLocation();
+  const role = location.pathname.startsWith("/professor") ? "professor" : "student";
   const certificates = [
     {
       id: 1,
@@ -31,7 +34,7 @@ const StudentCertificates = () => {
   ];
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout role={role}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Mis Certificados</h1>

@@ -8,8 +8,11 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Clock, Users, BookOpen } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 const StudentCourses = () => {
+  const location = useLocation();
+  const role = location.pathname.startsWith("/professor") ? "professor" : "student";
   const enrolledCourses = [
     {
       id: 1,
@@ -34,7 +37,7 @@ const StudentCourses = () => {
   ];
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout role={role}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Mis Cursos</h1>

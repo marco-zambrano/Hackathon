@@ -11,8 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Search, Calendar, Users, BookOpen } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 const StudentExplore = () => {
+  const location = useLocation();
+  const role = location.pathname.startsWith("/professor") ? "professor" : "student";
   const availableCourses = [
     {
       id: 1,
@@ -54,7 +57,7 @@ const StudentExplore = () => {
   ];
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout role={role}>
       <div className="space-y-6">
         <div>
           <h1 className="text-3xl font-bold">Explorar Cursos</h1>

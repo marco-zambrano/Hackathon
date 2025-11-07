@@ -14,12 +14,15 @@ import { Textarea } from "@/components/ui/textarea";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sparkles, User, Upload } from "lucide-react";
+import { useLocation } from "react-router-dom";
 
 const StudentProfile = () => {
   const [profileProgress, setProfileProgress] = useState(60);
+  const location = useLocation();
+  const role = location.pathname.startsWith("/professor") ? "professor" : "student";
 
   return (
-    <DashboardLayout role="student">
+    <DashboardLayout role={role}>
       <div className="space-y-6 max-w-4xl">
         <div>
           <h1 className="text-3xl font-bold">Mi Perfil</h1>
