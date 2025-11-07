@@ -1,6 +1,5 @@
-import { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { supabase } from "@/backend/supabase-client";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -11,59 +10,7 @@ export const ProtectedRoute = ({
   children,
   allowedRoles,
 }: ProtectedRouteProps) => {
-  const [loading, setLoading] = useState(true);
-  const [userRole, setUserRole] = useState<string | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    const checkAuth = async () => {
-      try {
-        const {
-          data: { user },
-        } = await supabase.auth.getUser();
-
-        if (!user) {
-          setIsAuthenticated(false);
-          setLoading(false);
-          return;
-        }
-
-        setIsAuthenticated(true);
-
-        // Obtener el rol del usuario
-        const { data: profile, error } = await supabase
-          .from("profiles")
-          .select("role")
-          .eq("id", user.id)
-          .single();
-
-        if (error || !profile) {
-          console.error("Error al obtener el perfil:", error);
-          setIsAuthenticated(false);
-          setLoading(false);
-          return;
-        }
-
-        setUserRole(profile.role);
-        setLoading(false);
-      } catch (error) {
-        console.error("Error en verificación de autenticación:", error);
-        setIsAuthenticated(false);
-        setLoading(false);
-      }
-    };
-
-    checkAuth();
-
-    // Escuchar cambios de autenticación
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange(() => {
-      checkAuth();
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -76,13 +23,13 @@ export const ProtectedRoute = ({
     );
   }
 
-  if (!isAuthenticated) {
+  if (!user || !profile) {
     return <Navigate to="/login" replace />;
   }
 
-  if (userRole && !allowedRoles.includes(userRole as any)) {
+  if (!allowedRoles.includes(profile.role)) {
     // Redirigir al dashboard correcto según el rol
-    switch (userRole) {
+    switch (profile.role) {
       case "ADMIN":
         return <Navigate to="/admin/dashboard" replace />;
       case "STUDENT":
