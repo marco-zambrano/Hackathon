@@ -23,7 +23,7 @@ const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  // const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
   // Redirect based on role
@@ -39,8 +39,6 @@ const Login = () => {
         setError('No se encontró el perfil del usuario');
         return;
       }
-
-      console.log(profile, error);
 
       switch (profile.role) {
         case 'ADMIN':
@@ -79,31 +77,38 @@ const Login = () => {
   // handle submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // setLoading(true);
+    setLoading(true);
     setError("");
-    
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    if (error) {
-      setError(
-        error.message.includes('Invalid login credentials')
-          ? 'Correo o contraseña incorrectos'
-          : error.message
-      );
-      // setLoading(false);
-    } else if (data.user) {
-      console.log(data.user);
-      getUserRoleAndRedirect(data.user.id);
-      // setLoading(false);
+
+    try {
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      });
+
+      if (authError) {
+        setError(
+          authError.message.includes("Invalid login credentials")
+            ? "Correo o contraseña incorrectos"
+            : authError.message
+        );
+        return;
+      }
+
+      if (data.user) {
+        await getUserRoleAndRedirect(data.user.id);
+      }
+    } catch (err) {
+      console.error("Error during email login", err);
+      setError("No se pudo completar el inicio de sesión. Inténtalo nuevamente.");
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
     setError("");
-    // setLoading(true);
+    setLoading(true);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -114,9 +119,10 @@ const Login = () => {
 
     if (error) {
       setError(error.message);
-      // setLoading(false);
+      setLoading(false);
+      return;
     }
-
+    setLoading(false);
   };
 
   return (
@@ -201,13 +207,14 @@ const Login = () => {
                 type="submit" 
                 className="w-full" 
                 size="lg"
+                disabled={loading}
                 style={{
                   backgroundColor: 'rgb(66, 133, 244)',
                   color: 'rgb(255, 255, 255)',
                   border: 'none'
                 }}
               >
-                Iniciar Sesión
+                {loading ? "Ingresando..." : "Iniciar Sesión"}
               </Button>
             </form>
 
@@ -228,7 +235,7 @@ const Login = () => {
               className="w-full"
               size="lg"
               onClick={handleGoogleLogin}
-              // disabled={loading}
+              disabled={loading}
               style={{
                 backgroundColor: 'rgb(255, 255, 255)',
                 color: 'rgb(51, 51, 51)',
