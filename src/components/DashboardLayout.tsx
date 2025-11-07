@@ -1,4 +1,4 @@
-import { ReactNode } from "react";
+import { ReactNode, useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
@@ -12,10 +12,14 @@ import {
   Users,
   BookMarked,
   LogOut,
+  Menu,
+  X,
+  ChevronLeft,
+  ChevronRight
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
-import { log } from "console";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 interface NavItem {
   title: string;
@@ -32,6 +36,30 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { profile, signOut } = useAuth();
+  const isMobile = useIsMobile();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  
+  // Close sidebar when route changes on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname, isMobile]);
+  
+  // Close sidebar when clicking outside on mobile
+  useEffect(() => {
+    if (!isMobile) return;
+    
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (sidebarOpen && !target.closest('aside') && !target.closest('button[aria-label="Toggle menu"]')) {
+        setSidebarOpen(false);
+      }
+    };
+    
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [sidebarOpen, isMobile]);
 
   const handleLogout = async () => {
     console.log("[DashboardLayout] Logout clicked", {
@@ -80,9 +108,24 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
       : studentNav;
 
   return (
-    <div className="flex min-h-screen w-full bg-background">
+    <div className="flex min-h-screen w-full bg-background relative">
+      {/* Mobile menu button */}
+      <button
+        onClick={() => setSidebarOpen(!sidebarOpen)}
+        className="fixed top-4 left-4 z-50 p-2 rounded-md md:hidden bg-sidebar text-sidebar-foreground hover:bg-sidebar-accent/50 transition-colors"
+        aria-label="Toggle menu"
+      >
+        {sidebarOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+      </button>
+
       {/* Sidebar */}
-      <aside className="w-64 bg-sidebar border-r border-sidebar-border flex flex-col">
+      <aside 
+        className={cn(
+          "fixed md:static inset-y-0 left-0 z-40 w-64 bg-sidebar border-r border-sidebar-border flex flex-col transform transition-transform duration-300 ease-in-out",
+          isMobile ? (sidebarOpen ? 'translate-x-0' : '-translate-x-full') : 'translate-x-0',
+          "md:translate-x-0" // Always show on desktop
+        )}
+      >
         {/* Logo */}
         <div className="p-6 border-b border-sidebar-border">
           <Link to="/" className="flex items-center gap-3">
@@ -149,8 +192,13 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="container mx-auto p-6 md:p-8">{children}</div>
+      <main className="flex-1 overflow-auto transition-all duration-300">
+        <div className="container mx-auto p-4 md:p-6 lg:p-8">
+          {isMobile && (
+            <div className="h-16"></div>
+          )}
+          {children}
+        </div>
       </main>
     </div>
   );
