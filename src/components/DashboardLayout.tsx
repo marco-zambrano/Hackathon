@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import {
   GraduationCap,
@@ -11,7 +11,10 @@ import {
   LayoutDashboard,
   Users,
   BookMarked,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/contexts/AuthContext";
+import { Button } from "@/components/ui/button";
 
 interface NavItem {
   title: string;
@@ -26,6 +29,13 @@ interface DashboardLayoutProps {
 
 const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const { profile, signOut } = useAuth();
+
+  const handleLogout = async () => {
+    await signOut();
+    navigate('/login');
+  };
 
   const studentNav: NavItem[] = [
     { title: "Mis Cursos", href: "/student/courses", icon: BookOpen },
@@ -99,20 +109,28 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
         </nav>
 
         {/* User Info */}
-        <div className="p-4 border-t border-sidebar-border">
+        <div className="p-4 border-t border-sidebar-border space-y-2">
           <div className="flex items-center gap-3 px-4 py-3 rounded-lg bg-sidebar-accent/30">
             <div className="h-10 w-10 rounded-full bg-primary/20 flex items-center justify-center">
               <User className="h-5 w-5 text-primary" />
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                Usuario
+                {profile ? `${profile.name} ${profile.last_name}` : 'Usuario'}
               </p>
               <p className="text-xs text-sidebar-foreground/60 truncate">
-                usuario@ejemplo.com
+                {profile?.email || 'usuario@ejemplo.com'}
               </p>
             </div>
           </div>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50"
+            onClick={handleLogout}
+          >
+            <LogOut className="h-4 w-4 mr-2" />
+            Cerrar Sesión
+          </Button>
         </div>
       </aside>
 
