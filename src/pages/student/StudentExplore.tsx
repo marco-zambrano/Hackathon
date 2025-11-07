@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   Card,
@@ -24,6 +25,56 @@ const StudentExplore = () => {
   const location = useLocation();
   const role = location.pathname.startsWith("/professor") ? "professor" : "student";
   const [availableCourses, setAvailableCourses] = useState<CourseWithProfessor[]>([]);
+  const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
+
+  const handleEnrollRequest = async (courseId: string) => {
+    try {
+      setLoading(prev => ({ ...prev, [courseId]: true }));
+      
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('No se pudo obtener la información del usuario');
+      }
+
+      const { error } = await supabase
+        .from('enrollments')
+        .insert([
+          { 
+            student_id: user.id, 
+            course_id: courseId,
+            status: 'PENDING'
+          }
+        ]);
+
+      if (error) throw error;
+
+      toast({
+        title: 'Solicitud enviada',
+        description: 'Tu solicitud de inscripción ha sido enviada correctamente.',
+        variant: 'default',
+      });
+
+      // Update the course to show it's pending
+      setAvailableCourses(prev => 
+        prev.map(course => 
+          course.id === courseId 
+            ? { ...course, status: 'PENDING' } 
+            : course
+        )
+      );
+      
+    } catch (error) {
+      console.error('Error al solicitar inscripción:', error);
+      toast({
+        title: 'Error',
+        description: error instanceof Error ? error.message : 'No se pudo enviar la solicitud',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(prev => ({ ...prev, [courseId]: false }));
+    }
+  };
 
   useEffect(() => {
     const fetchCourses = async () => {
@@ -128,9 +179,17 @@ const StudentExplore = () => {
               </CardContent>
 
               <CardFooter>
-                <Button className="w-full">
+                <Button 
+                  className="w-full"
+                  onClick={() => handleEnrollRequest(course.id)}
+                  disabled={loading[course.id] || course.status === 'PENDING'}
+                >
                   <BookOpen className="h-4 w-4 mr-2" />
-                  Solicitar Inscripción
+                  {loading[course.id] 
+                    ? 'Enviando...' 
+                    : course.status === 'PENDING'
+                      ? 'Solicitud Enviada'
+                      : 'Solicitar Inscripción'}
                 </Button>
               </CardFooter>
             </Card>
