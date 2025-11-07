@@ -11,10 +11,11 @@ import StudentExplore from "./pages/student/StudentExplore";
 import StudentCertificates from "./pages/student/StudentCertificates";
 import StudentProfile from "./pages/student/StudentProfile";
 // import ProfessorRequests from "./pages/professor/ProfessorRequests";
-// import AdminDashboard from "./pages/admin/AdminDashboard";
-// import AdminUsers from "./pages/admin/AdminUsers";
-// import AdminCourses from "./pages/admin/AdminCourses";
+import AdminDashboard from "./pages/admin/AdminDashboard";
+import AdminUsers from "./pages/admin/AdminUsers";
+import AdminCourses from "./pages/admin/AdminCourses";
 import NotFound from "./pages/NotFound";
+import ProfessorRequests from "./pages/professor/ProfessorRequests";
 
 const queryClient = new QueryClient();
 
@@ -36,16 +37,16 @@ const App = () => (
           <Route path="/student/profile" element={<StudentProfile />} />
           
           {/* Professor Routes (reuse student pages + requests) */}
-          {/* <Route path="/professor/courses" element={<StudentCourses />} />
+          <Route path="/professor/courses" element={<StudentCourses />} />
           <Route path="/professor/explore" element={<StudentExplore />} />
           <Route path="/professor/certificates" element={<StudentCertificates />} />
           <Route path="/professor/profile" element={<StudentProfile />} />
-          <Route path="/professor/requests" element={<ProfessorRequests />} /> */}
+          <Route path="/professor/requests" element={<ProfessorRequests />} />
           
           {/* Admin Routes */}
-          {/* <Route path="/admin/dashboard" element={<AdminDashboard />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
           <Route path="/admin/users" element={<AdminUsers />} />
-          <Route path="/admin/courses" element={<AdminCourses />} /> */}
+          <Route path="/admin/courses" element={<AdminCourses />} />
           
           <Route path="*" element={<NotFound />} />
         </Routes>
