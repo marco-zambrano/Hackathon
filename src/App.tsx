@@ -6,10 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
-// import StudentCourses from "./pages/student/StudentCourses";
-// import StudentExplore from "./pages/student/StudentExplore";
-// import StudentCertificates from "./pages/student/StudentCertificates";
-// import StudentProfile from "./pages/student/StudentProfile";
+import StudentCourses from "./pages/student/StudentCourses";
+import StudentExplore from "./pages/student/StudentExplore";
+import StudentCertificates from "./pages/student/StudentCertificates";
+import StudentProfile from "./pages/student/StudentProfile";
 // import ProfessorRequests from "./pages/professor/ProfessorRequests";
 // import AdminDashboard from "./pages/admin/AdminDashboard";
 // import AdminUsers from "./pages/admin/AdminUsers";
@@ -30,10 +30,10 @@ const App = () => (
           <Route path="/register" element={<Register />} />
           
           {/* Student Routes */}
-          {/* <Route path="/student/courses" element={<StudentCourses />} />
+          <Route path="/student/courses" element={<StudentCourses />} />
           <Route path="/student/explore" element={<StudentExplore />} />
           <Route path="/student/certificates" element={<StudentCertificates />} />
-          <Route path="/student/profile" element={<StudentProfile />} /> */}
+          <Route path="/student/profile" element={<StudentProfile />} />
           
           {/* Professor Routes (reuse student pages + requests) */}
           {/* <Route path="/professor/courses" element={<StudentCourses />} />
