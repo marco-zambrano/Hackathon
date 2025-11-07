@@ -1,14 +1,11 @@
 @import "tailwindcss";
 
-@import "tailwindcss/preflight";
-@import "tailwindcss/utilities";
-
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
 All colors MUST be HSL.
 */
 
 @layer base {
-  :root { 
+  :root {
     --background: 210 20% 98%;
     --foreground: 215 25% 15%;
 
