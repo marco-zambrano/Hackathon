@@ -14,7 +14,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { BookOpen, Users, Clock, Plus, Loader2, X } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
-import { supabase } from "@/backend/supabase-client";
 import { Course, CourseStatus } from "@/types/database";
 import {
   Dialog,
@@ -37,6 +36,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/backend/supabase-client";
 
 // Form validation schema
 const courseFormSchema = z.object({
@@ -59,7 +59,15 @@ interface CourseWithEnrollments extends Course {
 }
 
 const ProfessorCourses = () => {
-  const { profile } = useAuth();
+  const { user, session, profile } = useAuth();
+  
+  // Log session token
+  useEffect(() => {
+    if (session?.access_token) {
+      console.log('Session Token:', session.access_token);
+    }
+  }, [session]);
+
   const { toast } = useToast();
   const [courses, setCourses] = useState<CourseWithEnrollments[]>([]);
   const [loading, setLoading] = useState(true);
@@ -125,33 +133,36 @@ const ProfessorCourses = () => {
   const handleGenerateCertificate = async (enrollmentId: string, studentId: string) => {
     if (!currentCourseId) return;
     
+    // 2. Update the enrollment status to COMPLETED
+    const { error: updateError } = await supabase
+      .from('enrollments')
+      .update({ status: 'COMPLETED' })
+      .eq('id', enrollmentId);
+      
+    if (updateError) throw updateError;
+  
     try {
       setIsGeneratingCertificate(enrollmentId);
       
-      const response = await fetch(`/api/generate-certificate`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          course_id: currentCourseId,
+      // 1. Generate the certificate
+      const { data, error } = await supabase.functions.invoke('Certificate-Issuance', {
+        body: {
           student_id: studentId,
-        }),
+          course_id: currentCourseId,
+        },
       });
-
-      if (!response.ok) {
-        throw new Error('Error al generar el certificado');
-      }
-
-      const result = await response.json();
+      
+      if (error) throw error;
+    
+      
+      // 3. Remove the student from the local state
+      setEnrollments(prev => prev.filter(e => e.id !== enrollmentId));
       
       toast({
-        title: "¡Certificado generado!",
-        description: "El certificado se ha generado correctamente.",
+        title: '¡Certificado generado!',
+        description: 'El estudiante ha sido certificado exitosamente.',
+        variant: 'default',
       });
-      
-      // Refresh enrollments to update the UI
-      await fetchEnrollments(currentCourseId);
       
     } catch (error) {
       console.error('Error generating certificate:', error);
@@ -231,9 +242,10 @@ const ProfessorCourses = () => {
       setCourses(coursesWithCounts);
     } catch (error) {
       console.error('Error fetching courses:', error);
+      const errorMessage = error instanceof Error ? error.message : 'No se pudieron cargar los cursos.';
       toast({
         title: "Error",
-        description: "No se pudieron cargar los cursos.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
