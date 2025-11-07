@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   Card,
@@ -10,51 +11,51 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Calendar, Users, BookOpen } from "lucide-react";
+import { Search, Calendar, BookOpen } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { supabase } from "@/backend/supabase-client";
+import type { Course, Profile } from "@/types/database";
+
+type CourseWithProfessor = Course & {
+  professor?: Profile | null;
+};
 
 const StudentExplore = () => {
   const location = useLocation();
   const role = location.pathname.startsWith("/professor") ? "professor" : "student";
-  const availableCourses = [
-    {
-      id: 1,
-      title: "Ciberseguridad Básica",
-      professor: "Dr. Ana Torres",
-      description: "Fundamentos de seguridad informática y protección de datos",
-      startDate: "15 Mar 2024",
-      endDate: "30 Abr 2024",
-      maxStudents: 50,
-      currentStudents: 28,
-      skills: ["Seguridad", "Networking", "Ethical Hacking"],
-      status: "Abierto",
-    },
-    {
-      id: 2,
-      title: "Cloud Computing con AWS",
-      professor: "Ing. Roberto Sánchez",
-      description:
-        "Arquitectura y servicios en la nube con Amazon Web Services",
-      startDate: "20 Mar 2024",
-      endDate: "15 May 2024",
-      maxStudents: 40,
-      currentStudents: 35,
-      skills: ["AWS", "DevOps", "Cloud"],
-      status: "Abierto",
-    },
-    {
-      id: 3,
-      title: "UX/UI Design Fundamentals",
-      professor: "Dra. Laura Méndez",
-      description: "Principios de diseño centrado en el usuario",
-      startDate: "10 Abr 2024",
-      endDate: "25 May 2024",
-      maxStudents: 35,
-      currentStudents: 15,
-      skills: ["Figma", "User Research", "Prototyping"],
-      status: "Abierto",
-    },
-  ];
+  const [availableCourses, setAvailableCourses] = useState<CourseWithProfessor[]>([]);
+
+  useEffect(() => {
+    const fetchCourses = async () => {
+      const { data, error } = await supabase
+        .from("courses")
+        .select(`
+          *,
+          professor:profiles (
+            id,
+            first_name,
+            last_name,
+            email,
+            role,
+            avatar_url
+          )
+        `);
+
+      if (error) {
+        console.error("Error fetching courses", error);
+        return;
+      }
+
+      setAvailableCourses((data ?? []) as CourseWithProfessor[]);
+      const courses = availableCourses
+      console.log(courses);
+      
+
+    };
+
+    fetchCourses();
+  }, []);
+
 
   return (
     <DashboardLayout role={role}>
@@ -77,7 +78,13 @@ const StudentExplore = () => {
 
         {/* Courses Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {availableCourses.map((course) => (
+          {availableCourses.map((course) => {
+            const professorName = course.professor
+              ? `${course.professor.first_name ?? ""} ${course.professor.last_name ?? ""}`.trim()
+              : "Profesor asignado";
+            const enrolledLabel = "--";
+
+            return (
             <Card
               key={course.id}
               className="flex flex-col hover:shadow-lg transition-shadow"
@@ -86,11 +93,11 @@ const StudentExplore = () => {
                 <div className="flex items-start justify-between mb-2">
                   <Badge variant="secondary">{course.status}</Badge>
                   <div className="text-xs text-muted-foreground">
-                    {course.currentStudents}/{course.maxStudents}
+                      {enrolledLabel}/{course.max_students ?? "--"}
                   </div>
                 </div>
                 <CardTitle className="text-lg">{course.title}</CardTitle>
-                <CardDescription>{course.professor}</CardDescription>
+                  <CardDescription>{professorName}</CardDescription>
               </CardHeader>
 
               <CardContent className="flex-1 space-y-4">
@@ -102,21 +109,21 @@ const StudentExplore = () => {
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    <span>Inicio: {course.startDate}</span>
+                      <span>Inicio: {course.start_date ?? "Por definir"}</span>
                   </div>
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    <span>Fin: {course.endDate}</span>
+                      <span>Fin: {course.end_date ?? "Por definir"}</span>
                   </div>
                 </div>
 
                 {/* Skills */}
                 <div className="flex flex-wrap gap-2">
-                  {course.skills.map((skill) => (
-                    <Badge key={skill} variant="outline" className="text-xs">
-                      {skill}
-                    </Badge>
-                  ))}
+                    {(course.skills ?? []).map((skill) => (
+                      <Badge key={skill} variant="outline" className="text-xs">
+                        {skill}
+                      </Badge>
+                    ))}
                 </div>
               </CardContent>
 
@@ -127,7 +134,8 @@ const StudentExplore = () => {
                 </Button>
               </CardFooter>
             </Card>
-          ))}
+            );
+          })}
         </div>
       </div>
     </DashboardLayout>
