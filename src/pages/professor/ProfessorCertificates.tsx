@@ -39,7 +39,7 @@ const ProfessorCertificates = () => {
           .from("certificates")
           .select(`
             *,
-            courses (
+            courses!inner (
               *,
               professor:profiles!courses_professor_id_fkey (
                 id,
@@ -57,7 +57,7 @@ const ProfessorCertificates = () => {
               avatar_url
             )
           `)
-          .eq("professor_id", profile.id)
+          .eq("courses.professor_id", profile.id)
           .order('created_at', { ascending: false });
 
         if (error) throw error;

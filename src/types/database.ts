@@ -52,7 +52,6 @@ export interface Certificate {
   id: string;
   readable_code: string;
   student_id: string;
-  professor_id: string;
   course_id: string;
   digital_signature: string;
   issued_date?: string;
@@ -65,7 +64,6 @@ export interface Certificate {
   // Relations
   course?: Course;
   student?: Profile;
-  professor?: Profile;
 }
 
 
