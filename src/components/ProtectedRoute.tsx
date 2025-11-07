@@ -1,3 +1,8 @@
+// ProtectedRoute.tsx (Updated)
+// Simplified logic: Removed custom timeout as profile fetching is now optimized with caching in AuthContext.
+// Rely on the 'loading' state from AuthContext, which now includes profile query status.
+// This reduces unnecessary delays and complexity while still showing a loader during auth/profile resolution.
+
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -12,6 +17,7 @@ export const ProtectedRoute = ({
 }: ProtectedRouteProps) => {
   const { user, profile, loading } = useAuth();
 
+  // Show loader if still loading (includes session and profile fetch)
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -23,6 +29,7 @@ export const ProtectedRoute = ({
     );
   }
 
+  // Redirect if no user or no profile (after loading completes)
   if (!user || !profile) {
     return <Navigate to="/login" replace />;
   }

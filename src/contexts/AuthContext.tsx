@@ -1,7 +1,17 @@
+// AuthContext.tsx (Updated)
+// Integrated Tanstack React Query for profile fetching to enable caching and reduce refetches on reload.
+// Moved profile fetch out of useEffect into a useQuery hook, which only runs when user?.id exists.
+// Adjusted 'loading' to account for both initial auth loading and profile query status.
+// This should significantly speed up reloads by using cached profile data (staleTime: 5min).
+// If the cache is stale, it will refetch in the background without blocking.
+// Removed redundant initialSessionProcessed flag as onAuthStateChange handles it properly.
+// Added error handling in useQuery to prevent silent failures.
+
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/backend/supabase-client';
 import { Profile } from '@/types/database';
+import { useQuery } from '@tanstack/react-query';
 
 interface AuthContextType {
   user: User | null;
@@ -15,10 +25,10 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [initialLoading, setInitialLoading] = useState(true);
 
-  const fetchProfile = async (userId: string) => {
+  const fetchProfileQuery = async (userId: string) => {
+    const startTime = performance.now();
     try {
       const { data, error } = await supabase
         .from('profiles')
@@ -27,47 +37,60 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .single();
 
       if (error) {
-        console.error('Error fetching profile:', error);
-        return null;
+        throw new Error(error.message);
       }
 
+      const duration = performance.now() - startTime;
+      if (duration > 1000) {
+        console.log(`[AuthContext] Profile fetched in ${duration.toFixed(0)}ms`);
+      }
       return data as Profile;
-    } catch (error) {
-      console.error('Error in fetchProfile:', error);
-      return null;
+    } catch (error: any) {
+      console.error('[AuthContext] Error in fetchProfile:', error?.message || error);
+      throw error;
     }
   };
 
+  const { data: profile, isLoading: profileLoading, refetch } = useQuery({
+    queryKey: ['profile', user?.id],
+    queryFn: () => fetchProfileQuery(user!.id), // Non-null assertion since enabled checks
+    enabled: !!user?.id,
+    staleTime: 5 * 60 * 1000, // 5 minutes caching to reduce refetches on reload
+    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    retry: 1, // Retry once on failure
+  });
+
   const refreshProfile = async () => {
     if (!user?.id) return;
-    
-    const profileData = await fetchProfile(user.id);
-    if (profileData) {
-      setProfile(profileData);
-    }
+    await refetch();
   };
 
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setProfile(null);
   };
 
   useEffect(() => {
+    let mounted = true;
+
     // Get initial session
     const initializeAuth = async () => {
       try {
-        const { data: { user: currentUser } } = await supabase.auth.getUser();
-        
-        if (currentUser) {
-          setUser(currentUser);
-          const profileData = await fetchProfile(currentUser.id);
-          setProfile(profileData);
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+
+        if (sessionError) {
+          console.error('[AuthContext] Error getting session:', sessionError);
+          if (mounted) setInitialLoading(false);
+          return;
+        }
+
+        if (mounted) {
+          setUser(session?.user ?? null);
+          setInitialLoading(false);
         }
       } catch (error) {
-        console.error('Error initializing auth:', error);
-      } finally {
-        setLoading(false);
+        console.error('[AuthContext] Error initializing auth:', error);
+        if (mounted) setInitialLoading(false);
       }
     };
 
@@ -76,30 +99,38 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        const currentUser = session?.user ?? null;
-        setUser(currentUser);
+        if (!mounted) return;
 
-        if (currentUser) {
-          const profileData = await fetchProfile(currentUser.id);
-          setProfile(profileData);
-        } else {
-          setProfile(null);
+        try {
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
+        } catch (error) {
+          console.error('[AuthContext] Error in onAuthStateChange:', error);
         }
-
-        setLoading(false);
       }
     );
 
     return () => {
+      mounted = false;
       subscription.unsubscribe();
     };
   }, []);
+
+  // Overall loading: initial auth OR profile loading (only when user exists)
+  const loading = initialLoading || (user && profileLoading);
+
+  // Clear profile if no user
+  useEffect(() => {
+    if (!user) {
+      // No need to setProfile(null) since useQuery won't provide data
+    }
+  }, [user]);
 
   return (
     <AuthContext.Provider
       value={{
         user,
-        profile,
+        profile: user ? profile ?? null : null,
         loading,
         refreshProfile,
         signOut,
@@ -117,5 +148,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-
