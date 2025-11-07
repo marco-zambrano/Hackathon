@@ -100,7 +100,8 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
     { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { title: "Usuarios", href: "/admin/users", icon: Users },
     { title: "Cursos", href: "/admin/courses", icon: BookMarked },
-    { title: "Verificar Certificado", href: "/admin/certificates", icon: Award },
+    { title: "Certificados", href: "/admin/certificates", icon: Award },
+    { title: "Verificar Certificado", href: "/verify-certificate", icon: Award },
   ];
 
   const navItems =

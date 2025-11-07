@@ -40,7 +40,7 @@ const App = () => (
           {/* Públicas - Accesibles para todos */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
-          <Route path="/verify-certificate" element={<VerifyCertificate />} />
+          <Route path="/verify" element={<VerifyCertificate />} />
           
           {/* Student Routes - Solo STUDENT */}
           <Route 

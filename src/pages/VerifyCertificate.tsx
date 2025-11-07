@@ -1,6 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { supabase } from "@/backend/supabase-client";
 import {
   Card,
   CardContent,
@@ -8,76 +7,133 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Search, CheckCircle, XCircle, Loader2 } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Search, CheckCircle, XCircle, Loader2, FileText, ExternalLink } from "lucide-react";
+import { supabase } from "@/backend/supabase-client";
 
-type Certificate = {
-  id: string;
-  student_name: string;
-  student_last_name: string;
-  course_title: string;
-  issue_date: string;
-  status: 'pending' | 'approved' | 'rejected';
-  verification_code: string;
-};
+interface CertificateData {
+  id?: string;
+  readable_code?: string;
+  student_id?: string;
+  course_id?: string;
+  student_name?: string;
+  course_name?: string;
+  issued_date?: string;
+  expiration_date?: string | null;
+  revoked?: boolean;
+  revoked_at?: string | null;
+  revocation_reason?: string | null;
+  pdf_url?: string | null;
+  created_at?: string;
+}
+
+interface VerificationResult {
+  valid: boolean;
+  message?: string;
+  certificate?: CertificateData;
+}
 
 const VerifyCertificate = () => {
   const [searchParams] = useSearchParams();
-  const [verificationCode, setVerificationCode] = useState(
-    searchParams.get('code') || ''
-  );
-  const [loading, setLoading] = useState(false);
-  const [certificate, setCertificate] = useState<Certificate | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [verificationCode, setVerificationCode] = useState("");
+  const [readableCode, setReadableCode] = useState("");
+  const [activeTab, setActiveTab] = useState("code");
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   const handleVerify = async () => {
-    if (!verificationCode.trim()) {
-      setError('Por favor ingresa un código de verificación');
-      return;
-    }
+    setIsVerifying(true);
+    setVerificationResult(null);
 
     try {
-      setLoading(true);
-      setError(null);
-      
-      const { data, error: fetchError } = await supabase
-        .from('certificates')
-        .select(`
-          id,
-          verification_code,
-          status,
-          issue_date,
-          profiles:student_id (first_name, last_name),
-          courses (title)
-        `)
-        .eq('verification_code', verificationCode.trim())
-        .single();
+      let uuid = "";
 
-      if (fetchError) throw fetchError;
-      if (!data) {
-        throw new Error('No se encontró ningún certificado con este código');
+      if (activeTab === "code") {
+        const verificationId = verificationCode.trim();
+        if (!verificationId) {
+          setVerificationResult({ valid: false, message: "Por favor ingresa un código de verificación" });
+          setIsVerifying(false);
+          return;
+        }
+        uuid = verificationId;
+      } else {
+        // Para código legible: primero obtener el certificado de la tabla certificates
+        const readableId = readableCode.trim();
+        if (!readableId) {
+          setVerificationResult({ valid: false, message: "Por favor ingresa un código legible" });
+          setIsVerifying(false);
+          return;
+        }
+
+        // Obtener el certificado de la tabla certificates usando readable_code
+        const { data: certificateData, error: certError } = await supabase
+          .from("certificates")
+          .select("id")
+          .eq("readable_code", readableId)
+          .single();
+
+        if (certError || !certificateData) {
+          throw new Error("Certificado no encontrado con el código legible proporcionado");
+        }
+
+        // Extraer el UUID del certificado
+        uuid = certificateData.id;
+        if (!uuid) {
+          throw new Error("No se pudo obtener el UUID del certificado");
+        }
       }
 
-      const profile = data.profiles?.[0] || { first_name: null, last_name: null };
-      const course = data.courses?.[0] || { title: null };
+      // Ejecutar la función usando solo el UUID
+      const { data, error } = await supabase.functions.invoke(`Verify-Certificate?id=${uuid}`);
 
-      setCertificate({
-        id: data.id,
-        student_name: profile.first_name || 'N/A',
-        student_last_name: profile.last_name || 'N/A',
-        course_title: course.title || 'Curso no disponible',
-        issue_date: new Date(data.issue_date).toLocaleDateString(),
-        status: data.status || 'pending',
-        verification_code: data.verification_code,
-      });
-    } catch (err: any) {
-      setError(err.message || 'Error al verificar el certificado');
-      setCertificate(null);
+      if (error) throw error;
+
+      setVerificationResult(data);
+      console.log('Verification result:', data);
+    } catch (error: any) {
+      console.error('Error verifying certificate:', error.message);
+      setVerificationResult({ valid: false, message: error.message || "Error al verificar el certificado" });
     } finally {
-      setLoading(false);
+      setIsVerifying(false);
     }
   };
+
+  // Verificar automáticamente si hay un parámetro id en la URL
+  useEffect(() => {
+    const idFromUrl = searchParams.get("id");
+    
+    if (idFromUrl) {
+      // Establecer el código y tab inmediatamente
+      setVerificationCode(idFromUrl);
+      setActiveTab("code");
+      
+      // Verificar automáticamente de inmediato
+      setIsVerifying(true);
+      setVerificationResult(null);
+
+      const verifyFromUrl = async () => {
+        try {
+          const { data, error } = await supabase.functions.invoke(`Verify-Certificate?id=${idFromUrl}`);
+
+          if (error) throw error;
+
+          setVerificationResult(data);
+          console.log('Verification result from URL:', data);
+        } catch (error: any) {
+          console.error('Error verifying certificate from URL:', error.message);
+          setVerificationResult({ valid: false, message: error.message || "Error al verificar el certificado" });
+        } finally {
+          setIsVerifying(false);
+        }
+      };
+
+      // Ejecutar inmediatamente
+      verifyFromUrl();
+    }
+  }, [searchParams]);
 
   return (
     <div className="container mx-auto py-8 px-4">
@@ -89,108 +145,227 @@ const VerifyCertificate = () => {
           </p>
         </div>
 
+        {/* Mostrar resultado de verificación arriba */}
+        {isVerifying && !verificationResult && (
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-center space-x-2">
+                <Loader2 className="h-5 w-5 animate-spin text-primary" />
+                <p className="text-muted-foreground">Verificando certificado...</p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {verificationResult && (
+          <Card className="mb-6">
+            <CardContent className="pt-6">
+              {verificationResult.valid ? (
+                <Alert className="border-green-500 bg-green-50 dark:bg-green-950">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800 dark:text-green-200">
+                    <strong className="font-semibold text-lg">Certificado Válido</strong>
+                    {verificationResult.message && (
+                      <p className="mt-2">{verificationResult.message}</p>
+                    )}
+                    {verificationResult.certificate && (
+                      <div className="mt-4 space-y-3 text-sm">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {verificationResult.certificate.readable_code && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Código de Certificado</p>
+                              <p className="font-mono font-semibold">{verificationResult.certificate.readable_code}</p>
+                            </div>
+                          )}
+                          {verificationResult.certificate.student_name && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Estudiante</p>
+                              <p className="font-medium">{verificationResult.certificate.student_name}</p>
+                            </div>
+                          )}
+                          {verificationResult.certificate.course_name && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Curso</p>
+                              <p className="font-medium">{verificationResult.certificate.course_name}</p>
+                            </div>
+                          )}
+                          {verificationResult.certificate.issued_date && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Fecha de Emisión</p>
+                              <p className="font-medium">{new Date(verificationResult.certificate.issued_date).toLocaleDateString('es-ES', { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              })}</p>
+                            </div>
+                          )}
+                          {verificationResult.certificate.expiration_date && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Fecha de Expiración</p>
+                              <p className="font-medium">{new Date(verificationResult.certificate.expiration_date).toLocaleDateString('es-ES', { 
+                                year: 'numeric', 
+                                month: 'long', 
+                                day: 'numeric' 
+                              })}</p>
+                            </div>
+                          )}
+                          {verificationResult.certificate.revoked !== undefined && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Estado</p>
+                              <p className={`font-medium ${verificationResult.certificate.revoked ? 'text-red-600' : 'text-green-600'}`}>
+                                {verificationResult.certificate.revoked ? 'Revocado' : 'Válido'}
+                              </p>
+                            </div>
+                          )}
+                          {verificationResult.certificate.revoked_at && (
+                            <div>
+                              <p className="text-xs text-muted-foreground mb-1">Fecha de Revocación</p>
+                              <p className="font-medium text-red-600">
+                                {new Date(verificationResult.certificate.revoked_at).toLocaleDateString('es-ES', { 
+                                  year: 'numeric', 
+                                  month: 'long', 
+                                  day: 'numeric' 
+                                })}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                        {verificationResult.certificate.revocation_reason && (
+                          <div className="mt-2 p-2 bg-red-50 dark:bg-red-950 rounded-md">
+                            <p className="text-xs text-muted-foreground mb-1">Razón de Revocación</p>
+                            <p className="text-sm text-red-800 dark:text-red-200">{verificationResult.certificate.revocation_reason}</p>
+                          </div>
+                        )}
+                        {verificationResult.certificate.pdf_url && (
+                          <div className="mt-4 pt-4 border-t border-green-200 dark:border-green-800">
+                            <a
+                              href={verificationResult.certificate.pdf_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-md transition-colors text-sm font-medium"
+                            >
+                              <FileText className="h-4 w-4" />
+                              Ver Certificado PDF
+                              <ExternalLink className="h-3 w-3" />
+                            </a>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <Alert variant="destructive">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <strong className="font-semibold text-lg">Certificado Inválido</strong>
+                    {verificationResult.message && (
+                      <p className="mt-2">{verificationResult.message}</p>
+                    )}
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+          </Card>
+        )}
+
         <Card className="w-full">
           <CardHeader>
-            <CardTitle>Verificar por Código</CardTitle>
+            <CardTitle>Método de Verificación</CardTitle>
             <CardDescription>
-              Ingresa el código de verificación del certificado
+              Selecciona cómo deseas verificar el certificado
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="flex flex-col space-y-4">
-              <div className="flex space-x-2">
-                <Input
-                  placeholder="Código de verificación"
-                  value={verificationCode}
-                  onChange={(e) => setVerificationCode(e.target.value)}
-                  className="flex-1"
-                  onKeyDown={(e) => e.key === 'Enter' && handleVerify()}
-                />
+            <Tabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="code">Por Código</TabsTrigger>
+                <TabsTrigger value="readable">Por código legible</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="code" className="mt-6">
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="verificationCode"
+                      className="block text-sm font-medium mb-2"
+                    >
+                      Código de Verificación
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="verificationCode"
+                        type="text"
+                        placeholder="Ingresa el código del certificado"
+                        className="pl-10"
+                        value={verificationCode}
+                        onChange={(e) => setVerificationCode(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      El código se encuentra en la parte inferior del
+                      certificado
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <TabsContent value="readable" className="mt-6">
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      htmlFor="readableCode"
+                      className="block text-sm font-medium mb-2"
+                    >
+                      Código Legible
+                    </label>
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="readableCode"
+                        type="text"
+                        placeholder="Ingresa el código legible del certificado"
+                        className="pl-10"
+                        value={readableCode}
+                        onChange={(e) => setReadableCode(e.target.value)}
+                      />
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      El código legible se encuentra en el certificado
+                    </p>
+                  </div>
+                </div>
+              </TabsContent>
+
+              <div className="mt-6">
                 <Button 
+                  className="w-full" 
+                  size="lg" 
                   onClick={handleVerify}
-                  disabled={loading || !verificationCode.trim()}
+                  disabled={isVerifying || (activeTab === "code" && !verificationCode.trim()) || (activeTab === "readable" && !readableCode.trim())}
                 >
-                  {loading ? (
+                  {isVerifying ? (
                     <>
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                       Verificando...
                     </>
                   ) : (
-                    <>
-                      <Search className="mr-2 h-4 w-4" />
-                      Verificar
-                    </>
+                    "Verificar Certificado"
                   )}
                 </Button>
               </div>
-
-              {error && (
-                <div className="text-sm text-red-500 flex items-center">
-                  <XCircle className="h-4 w-4 mr-2" />
-                  {error}
-                </div>
-              )}
-
-              {certificate && (
-                <Card className="mt-6 border-green-200 bg-green-50">
-                  <CardHeader>
-                    <div className="flex items-center justify-between">
-                      <CardTitle className="text-green-800">
-                        Certificado Válido
-                      </CardTitle>
-                      <CheckCircle className="h-6 w-6 text-green-600" />
-                    </div>
-                    <CardDescription>
-                      Los detalles del certificado se muestran a continuación
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <p className="text-sm text-muted-foreground">Estudiante</p>
-                        <p className="font-medium">
-                          {certificate.student_name} {certificate.student_last_name}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Curso</p>
-                        <p className="font-medium">{certificate.course_title}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Fecha de Emisión</p>
-                        <p className="font-medium">{certificate.issue_date}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-muted-foreground">Estado</p>
-                        <p className="font-medium">
-                          {certificate.status === 'approved' ? (
-                            <span className="text-green-600">Aprobado</span>
-                          ) : certificate.status === 'rejected' ? (
-                            <span className="text-red-600">Rechazado</span>
-                          ) : (
-                            <span className="text-amber-600">Pendiente</span>
-                          )}
-                        </p>
-                      </div>
-                      <div className="col-span-2">
-                        <p className="text-sm text-muted-foreground">Código de Verificación</p>
-                        <p className="font-mono font-medium bg-gray-100 p-2 rounded-md">
-                          {certificate.verification_code}
-                        </p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
-            </div>
-            
-            <div className="mt-6 text-center">
-              <p className="text-sm text-muted-foreground">
-                ¿Problemas para verificar? Contacta al soporte técnico
-              </p>
-            </div>
+            </Tabs>
           </CardContent>
         </Card>
+
+        <div className="mt-6 text-center text-sm text-muted-foreground">
+          <p>¿Problemas para verificar? Contacta al soporte técnico</p>
+        </div>
       </div>
     </div>
   );
