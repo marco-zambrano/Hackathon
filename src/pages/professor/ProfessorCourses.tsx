@@ -64,9 +64,14 @@ const ProfessorCourses = () => {
   const [courses, setCourses] = useState<CourseWithEnrollments[]>([]);
   const [loading, setLoading] = useState(true);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isManageDialogOpen, setIsManageDialogOpen] = useState(false);
+  const [currentCourseId, setCurrentCourseId] = useState<string | null>(null);
+  const [enrollments, setEnrollments] = useState<any[]>([]);
+  const [isLoadingEnrollments, setIsLoadingEnrollments] = useState(false);
+  const [isGeneratingCertificate, setIsGeneratingCertificate] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<CourseFormValues>({
+  const form = useForm({
     resolver: zodResolver(courseFormSchema),
     defaultValues: {
       title: "",
@@ -78,6 +83,87 @@ const ProfessorCourses = () => {
       status: "PENDING"
     },
   });
+
+  const handleManageCourse = async (courseId: string) => {
+    setCurrentCourseId(courseId);
+    setIsManageDialogOpen(true);
+    await fetchEnrollments(courseId);
+  };
+
+  const fetchEnrollments = async (courseId: string) => {
+    try {
+      setIsLoadingEnrollments(true);
+      const { data, error } = await supabase
+        .from('enrollments')
+        .select(`
+          id,
+          status,
+          created_at,
+          profiles:student_id (
+            id,
+            first_name,
+            last_name,
+            email
+          )
+        `)
+        .eq('course_id', courseId);
+
+      if (error) throw error;
+      setEnrollments(data || []);
+    } catch (error) {
+      console.error('Error fetching enrollments:', error);
+      toast({
+        title: "Error",
+        description: "No se pudieron cargar los estudiantes inscritos.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingEnrollments(false);
+    }
+  };
+
+  const handleGenerateCertificate = async (enrollmentId: string, studentId: string) => {
+    if (!currentCourseId) return;
+    
+    try {
+      setIsGeneratingCertificate(enrollmentId);
+      
+      const response = await fetch(`/api/generate-certificate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          course_id: currentCourseId,
+          student_id: studentId,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Error al generar el certificado');
+      }
+
+      const result = await response.json();
+      
+      toast({
+        title: "¡Certificado generado!",
+        description: "El certificado se ha generado correctamente.",
+      });
+      
+      // Refresh enrollments to update the UI
+      await fetchEnrollments(currentCourseId);
+      
+    } catch (error) {
+      console.error('Error generating certificate:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo generar el certificado. Por favor, inténtalo de nuevo.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsGeneratingCertificate(null);
+    }
+  };
 
   const onSubmit = async (data: CourseFormValues) => {
     if (!profile?.id) return;
@@ -221,11 +307,12 @@ const ProfessorCourses = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <Button variant="default" className="flex-1">
-                      Ver Detalles
-                    </Button>
-                    <Button variant="outline" className="flex-1">
-                      Gestionar
+                    <Button 
+                      variant="outline" 
+                      className="flex-1"
+                      onClick={() => handleManageCourse(course.id)}
+                    >
+                      Gestionar Estudiantes
                     </Button>
                   </div>
                 </CardContent>
@@ -247,6 +334,86 @@ const ProfessorCourses = () => {
             </Button>
           </Card>
         )}
+
+        {/* Manage Enrollments Dialog */}
+        <Dialog open={isManageDialogOpen} onOpenChange={setIsManageDialogOpen}>
+          <DialogContent className="max-w-3xl">
+            <DialogHeader>
+              <DialogTitle>Gestionar Estudiantes</DialogTitle>
+              <DialogDescription>
+                Lista de estudiantes inscritos en este curso
+              </DialogDescription>
+            </DialogHeader>
+            
+            {isLoadingEnrollments ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-primary" />
+              </div>
+            ) : enrollments.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay estudiantes inscritos en este curso.
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="border rounded-lg overflow-hidden">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Estudiante
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Email
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Estado
+                        </th>
+                        <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Acciones
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {enrollments.map((enrollment) => (
+                        <tr key={enrollment.id}>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {enrollment.profiles ? `${enrollment.profiles.first_name} ${enrollment.profiles.last_name}` : 'N/A'}
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {enrollment.profiles?.email || 'N/A'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <Badge variant={enrollment.status === 'APPROVED' ? 'default' : 'secondary'}>
+                              {enrollment.status === 'APPROVED' ? 'Aprobado' : 'Pendiente'}
+                            </Badge>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <Button 
+                              size="sm" 
+                              onClick={() => handleGenerateCertificate(enrollment.id, enrollment.profiles?.id)}
+                              disabled={isGeneratingCertificate === enrollment.id}
+                            >
+                              {isGeneratingCertificate === enrollment.id ? (
+                                <>
+                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  Generando...
+                                </>
+                              ) : (
+                                'Generar Certificado'
+                              )}
+                            </Button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
 
         {/* Create Course Dialog */}
         <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -336,8 +503,11 @@ const ProfessorCourses = () => {
                               min="1"
                               placeholder="Ilimitado si se deja vacío"
                               {...field}
-                              value={field.value || ''}
-                              onChange={(e) => field.onChange(e.target.value === '' ? undefined : e.target.value)}
+                              value={field.value === undefined ? '' : String(field.value)}
+                              onChange={(e) => {
+                                const value = e.target.value;
+                                field.onChange(value === '' ? undefined : Number(value));
+                              }}
                             />
                           </FormControl>
                           <FormMessage />
