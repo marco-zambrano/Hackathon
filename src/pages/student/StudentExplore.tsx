@@ -78,30 +78,51 @@ const StudentExplore = () => {
 
   useEffect(() => {
     const fetchCourses = async () => {
-      const { data, error } = await supabase
-        .from("courses")
-        .select(`
-          *,
-          professor:profiles (
-            id,
-            first_name,
-            last_name,
-            email,
-            role,
-            avatar_url
-          )
-        `);
+      try {
+        // Get current user
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
 
-      if (error) {
-        console.error("Error fetching courses", error);
-        return;
+        // Get courses where the student is already enrolled
+        const { data: enrollments } = await supabase
+          .from('enrollments')
+          .select('course_id')
+          .eq('student_id', user.id);
+
+        const enrolledCourseIds = enrollments?.map(e => e.course_id) || [];
+
+        // Get all courses that the student is not enrolled in
+        let query = supabase
+          .from("courses")
+          .select(`
+            *,
+            professor:profiles (
+              id,
+              first_name,
+              last_name,
+              email,
+              role,
+              avatar_url
+            )
+          `)
+          .not('id', 'in', `(${enrolledCourseIds.join(',')})`);
+
+        // If no enrolled courses, just fetch all
+        if (enrolledCourseIds.length === 0) {
+          query = query.not('id', 'in', '(\'\')'); // Empty NOT IN clause
+        }
+
+        const { data, error } = await query;
+
+        if (error) {
+          console.error("Error fetching courses", error);
+          return;
+        }
+
+        setAvailableCourses((data ?? []) as CourseWithProfessor[]);
+      } catch (error) {
+        console.error("Error in fetchCourses:", error);
       }
-
-      setAvailableCourses((data ?? []) as CourseWithProfessor[]);
-      const courses = availableCourses
-      console.log(data);
-      
-
     };
 
     fetchCourses();
