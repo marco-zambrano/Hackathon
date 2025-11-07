@@ -4,7 +4,7 @@ export type UserRole = 'STUDENT' | 'PROFESSOR' | 'ADMIN';
 
 export type CourseStatus = 'PENDING' | 'ACTIVE';
 
-export type EnrollmentStatus = 'PENDING' | 'COMPLETED';
+export type EnrollmentStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'COMPLETED';
 
 export interface Profile {
   id: string;

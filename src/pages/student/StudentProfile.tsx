@@ -15,9 +15,11 @@ import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Sparkles, User, Upload } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 
 const StudentProfile = () => {
-  const [profileProgress, setProfileProgress] = useState(60);
+  const [profileProgress, setProfileProgress] = useState(100);
+  const { profile } = useAuth();
   const location = useLocation();
   const role = location.pathname.startsWith("/professor") ? "professor" : "student";
 
@@ -51,7 +53,7 @@ const StudentProfile = () => {
             {profileProgress === 100 && (
               <Button className="w-full" size="lg">
                 <Sparkles className="h-4 w-4 mr-2" />
-                Generar CV con IA
+                Gen erar CV con IA
               </Button>
             )}
           </CardContent>
