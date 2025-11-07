@@ -66,6 +66,21 @@ const Landing = () => {
                 Registrarse
               </Button>
             </Link>
+            <Link to="/verify">
+              <Button
+                size="lg"
+                variant="outline"
+                className="text-lg px-8 py-6 border-2 transition-all hover:bg-green-50"
+                style={{ 
+                  backgroundColor: 'rgb(255, 255, 255)', 
+                  color: 'rgb(51, 51, 51)',
+                  borderColor: 'rgb(34, 197, 94)'
+                }}
+              >
+                <Shield className="mr-2 h-5 w-5" style={{ color: 'rgb(34, 197, 94)' }} />
+                Verificar Certificado
+              </Button>
+            </Link>
           </div>
 
           {/* Info Text */}
