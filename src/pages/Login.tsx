@@ -81,6 +81,7 @@ const Login = () => {
     setError("");
 
     try {
+      // First try to sign in with email/password directly
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
