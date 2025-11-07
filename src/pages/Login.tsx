@@ -13,20 +13,46 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GraduationCap, Mail, Lock, AlertCircle } from "lucide-react";
+// import type { User } from "@supabase/supabase-js";
+import { supabase } from "@/backend/supabase-client";
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError("");
-    // Login logic will be implemented later
+    // setLoading(true);
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+    
+    if (error) {
+      setError(error.message);
+    } else {
+      setError("");
+      const newUser = data.user
+      console.log(newUser);
+    }
+    // setLoading(false);
   };
 
-  const handleGoogleLogin = () => {
-    // Google OAuth logic will be implemented later
+  const handleGoogleLogin = async () => {
+    setError("");
+    
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/`,
+      },
+    });
+
+    if (error) {
+      setError(error.message);
+    }
   };
 
   return (
