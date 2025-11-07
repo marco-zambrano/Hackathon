@@ -63,23 +63,20 @@ const Login = () => {
 
   // Verificar si venimos de OAuth de Google (detecta el hash en la URL)
   useEffect(() => {
-    const checkOAuthRedirect = async () => {
-      // Verificar si hay un hash de OAuth en la URL
-      const hashParams = new URLSearchParams(window.location.hash.substring(1));
-      const accessToken = hashParams.get('access_token');
-      
-      if (accessToken) {
-        // Venimos de OAuth, obtener el usuario y redirigir
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
-          await getUserRoleAndRedirect(user.id);
+    const { data: subscription } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        if (event === "SIGNED_IN" && session?.user) {
+          await getUserRoleAndRedirect(session.user.id);
         }
       }
+    );
+  
+    return () => {
+      subscription.subscription.unsubscribe();
     };
-
-    checkOAuthRedirect();
   }, [getUserRoleAndRedirect]);
 
+  // handle submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     // setLoading(true);
@@ -111,7 +108,7 @@ const Login = () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}`,
+        redirectTo: `${window.location.origin}/login`,
       },
     });
 
