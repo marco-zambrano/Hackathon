@@ -8,25 +8,84 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Award, Download, Calendar } from "lucide-react";
+import { Award, Download, Calendar, Loader2 } from "lucide-react";
+import { useLocation } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
+import { useEffect, useState } from "react";
+import { Certificate, Course, Profile } from "@/types/database";
+import { supabase } from "@/backend/supabase-client";
+
+interface CertificateWithDetails extends Certificate {
+  courses: Course & {
+    professor?: Profile | null;
+  };
+  student?: Profile | null;
+}
 
 const ProfessorCertificates = () => {
-  const certificates = [
-    {
-      id: 1,
-      courseName: "Metodologías Ágiles",
-      issuer: "Instituto Superior de TI",
-      issueDate: "15 Ene 2024",
-      skills: ["Scrum", "Kanban", "Gestión de Proyectos"],
-    },
-    {
-      id: 2,
-      courseName: "Liderazgo Educativo",
-      issuer: "Universidad Nacional",
-      issueDate: "20 Nov 2023",
-      skills: ["Liderazgo", "Pedagogía", "Gestión Académica"],
-    },
-  ];
+  const location = useLocation();
+  const role = location.pathname.startsWith("/professor") ? "professor" : "student";
+  const { profile } = useAuth();
+  const [certificates, setCertificates] = useState<CertificateWithDetails[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchCertificates = async () => {
+      if (!profile?.id) return;
+
+      try {
+        setLoading(true);
+        const { data, error } = await supabase
+          .from("certificates")
+          .select(`
+            *,
+            courses (
+              *,
+              professor:profiles!courses_professor_id_fkey (
+                id,
+                first_name,
+                last_name,
+                email,
+                avatar_url
+              )
+            ),
+            student:profiles!certificates_student_id_fkey (
+              id,
+              first_name,
+              last_name,
+              email,
+              avatar_url
+            )
+          `)
+          .eq("professor_id", profile.id)
+          .order('created_at', { ascending: false });
+
+        if (error) throw error;
+
+        setCertificates((data ?? []) as CertificateWithDetails[]);
+
+      } catch (error) {
+        console.error('Error fetching certificates:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCertificates();
+  }, [profile?.id]);
+
+  if (loading) {
+    return (
+      <DashboardLayout role={role}>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto mb-4" />
+            <p className="text-muted-foreground">Cargando certificados...</p>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
 
   return (
     <DashboardLayout role="professor">
@@ -40,7 +99,21 @@ const ProfessorCertificates = () => {
 
         {certificates.length > 0 ? (
           <div className="grid md:grid-cols-2 gap-6">
-            {certificates.map((cert) => (
+            {certificates.map((cert) => {
+              const course = cert.courses;
+              const student = cert.student;
+              const studentName = student
+                ? `${student.first_name} ${student.last_name}`
+                : "Estudiante";
+              const issuedDate = cert.issued_date
+                ? new Date(cert.issued_date).toLocaleDateString("es-ES", {
+                    day: "numeric",
+                    month: "long",
+                    year: "numeric",
+                  })
+                : "--";
+
+              return (
               <Card
                 key={cert.id}
                 className="hover:shadow-lg transition-all group"
@@ -54,22 +127,18 @@ const ProfessorCertificates = () => {
                       <div className="space-y-3 flex-1">
                         <div>
                           <h3 className="font-semibold text-lg">
-                            {cert.courseName}
+                            {course.title}
                           </h3>
                           <p className="text-sm text-muted-foreground">
-                            {cert.issuer}
+                            {studentName}
                           </p>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                          {cert.skills.map((skill) => (
-                            <Badge key={skill} variant="secondary">
-                              {skill}
-                            </Badge>
-                          ))}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground">
                           <Calendar className="h-3 w-3" />
-                          <span>Emitido: {cert.issueDate}</span>
+                          <span>Emitido: {issuedDate}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Código: <span className="font-mono">{cert.readable_code}</span>
                         </div>
                       </div>
                     </div>
@@ -83,7 +152,8 @@ const ProfessorCertificates = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+              );
+            })}
           </div>
         ) : (
           <Card className="p-12 text-center">
