@@ -59,14 +59,14 @@ interface CourseWithEnrollments extends Course {
 }
 
 const ProfessorCourses = () => {
-  const { user, session, profile } = useAuth();
+  const { user, profile } = useAuth();
   
-  // Log session token
+  // Log user token if needed
   useEffect(() => {
-    if (session?.access_token) {
-      console.log('Session Token:', session.access_token);
+    if (user) {
+      console.log('User authenticated:', user.id);
     }
-  }, [session]);
+  }, [user]);
 
   const { toast } = useToast();
   const [courses, setCourses] = useState<CourseWithEnrollments[]>([]);

@@ -42,12 +42,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const { data: profile, isLoading: profileLoading, refetch } = useQuery({
+  const { data: profile, isLoading: profileLoading, refetch } = useQuery<Profile | null>({
     queryKey: ['profile', user?.id],
-    queryFn: () => fetchProfileQuery(user!.id), // Non-null assertion since enabled checks
+    queryFn: () => user?.id ? fetchProfileQuery(user.id) : null,
     enabled: !!user?.id,
     staleTime: 5 * 60 * 1000, // 5 minutes caching to reduce refetches on reload
-    cacheTime: 10 * 60 * 1000, // Keep in cache for 10 minutes
+    gcTime: 10 * 60 * 1000, // Keep in cache for 10 minutes (renamed from cacheTime in newer versions)
     retry: 1, // Retry once on failure
   });
 
@@ -113,7 +113,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   // Clear profile if no user
   useEffect(() => {
     if (!user) {
-      // No need to setProfile(null) since useQuery won't provide data
+      // The query will handle this automatically with the enabled flag
     }
   }, [user]);
 
