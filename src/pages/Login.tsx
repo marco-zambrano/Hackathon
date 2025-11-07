@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,66 +13,136 @@ import {
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { GraduationCap, Mail, Lock, AlertCircle } from "lucide-react";
-// import type { User } from "@supabase/supabase-js";
 import { supabase } from "@/backend/supabase-client";
+
+interface Profile {
+  role: 'STUDENT' | 'PROFESSOR' | 'ADMIN' | null;
+}
 
 const Login = () => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(true);
-  
+  // const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+
+  // Redirect based on role
+  const getUserRoleAndRedirect = useCallback(async (userId: string) => {
+    try {
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', userId)
+        .single();
+
+      if (error || !profile) {
+        setError('No se encontró el perfil del usuario');
+        return;
+      }
+
+      console.log(profile, error);
+
+      switch (profile.role) {
+        case 'ADMIN':
+          navigate('/admin/dashboard');
+          break;
+        case 'STUDENT':
+          navigate('/student/explore');
+          break;
+        case 'PROFESSOR':
+          navigate('/professor/explore');
+          break;
+        default:
+          setError('Rol de usuario no válido');
+      }
+    } catch (err) {
+      setError('Error al procesar el inicio de sesión');
+      console.error('Error fetching role:', err);
+    }
+  }, [navigate]);
+
+  // Verificar si venimos de OAuth de Google (detecta el hash en la URL)
+  useEffect(() => {
+    const checkOAuthRedirect = async () => {
+      // Verificar si hay un hash de OAuth en la URL
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const accessToken = hashParams.get('access_token');
+      
+      if (accessToken) {
+        // Venimos de OAuth, obtener el usuario y redirigir
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          await getUserRoleAndRedirect(user.id);
+        }
+      }
+    };
+
+    checkOAuthRedirect();
+  }, [getUserRoleAndRedirect]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+    // setLoading(true);
+    setError("");
+    
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     
     if (error) {
-      setError(error.message);
-    } else {
-      setError("");
-      const newUser = data.user
-      console.log(newUser);
+      setError(
+        error.message.includes('Invalid login credentials')
+          ? 'Correo o contraseña incorrectos'
+          : error.message
+      );
+      // setLoading(false);
+    } else if (data.user) {
+      console.log(data.user);
+      getUserRoleAndRedirect(data.user.id);
+      // setLoading(false);
     }
-    setLoading(false);
   };
 
   const handleGoogleLogin = async () => {
     setError("");
-    setLoading(true);
+    // setLoading(true);
 
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/`,
+        redirectTo: `${window.location.origin}`,
       },
     });
 
     if (error) {
       setError(error.message);
+      // setLoading(false);
     }
+
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-background via-primary/5 to-accent/10 flex items-center justify-center p-4">
+    <div 
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        background: 'linear-gradient(to bottom right, rgb(245, 248, 252), rgb(255, 255, 250))'
+      }}
+    >
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="flex justify-center mb-8">
-          <div className="bg-card p-4 rounded-2xl shadow-lg border">
-            <GraduationCap className="h-12 w-12 text-primary" />
+          <div className="p-4 rounded-2xl shadow-lg" style={{ backgroundColor: 'rgb(255, 255, 255)' }}>
+            <GraduationCap className="h-12 w-12" style={{ color: 'rgb(66, 133, 244)' }} />
           </div>
         </div>
 
-        <Card className="shadow-xl">
+        <Card className="shadow-xl" style={{ backgroundColor: 'rgb(255, 255, 255)' }}>
           <CardHeader className="space-y-1">
-            <CardTitle className="text-2xl font-bold text-center">
+            <CardTitle className="text-2xl font-bold text-center" style={{ color: 'rgb(51, 51, 51)' }}>
               Iniciar Sesión
             </CardTitle>
-            <CardDescription className="text-center">
+            <CardDescription className="text-center" style={{ color: 'rgb(102, 102, 102)' }}>
               Ingresa tus credenciales para acceder a la plataforma
             </CardDescription>
           </CardHeader>
@@ -80,9 +150,11 @@ const Login = () => {
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email">Correo Electrónico</Label>
+                <Label htmlFor="email" style={{ color: 'rgb(51, 51, 51)', fontWeight: 'bold' }}>
+                  Correo Electrónico
+                </Label>
                 <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Mail className="absolute left-3 top-3 h-4 w-4" style={{ color: 'rgb(153, 153, 153)' }} />
                   <Input
                     id="email"
                     type="email"
@@ -90,15 +162,21 @@ const Login = () => {
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     className="pl-10"
+                    style={{
+                      borderColor: 'rgb(221, 221, 221)',
+                      backgroundColor: 'rgb(255, 255, 255)'
+                    }}
                     required
                   />
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password">Contraseña</Label>
+                <Label htmlFor="password" style={{ color: 'rgb(51, 51, 51)', fontWeight: 'bold' }}>
+                  Contraseña
+                </Label>
                 <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Lock className="absolute left-3 top-3 h-4 w-4" style={{ color: 'rgb(153, 153, 153)' }} />
                   <Input
                     id="password"
                     type="password"
@@ -106,6 +184,10 @@ const Login = () => {
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     className="pl-10"
+                    style={{
+                      borderColor: 'rgb(221, 221, 221)',
+                      backgroundColor: 'rgb(255, 255, 255)'
+                    }}
                     required
                   />
                 </div>
@@ -118,17 +200,26 @@ const Login = () => {
                 </Alert>
               )}
 
-              <Button type="submit" className="w-full" size="lg">
+              <Button 
+                type="submit" 
+                className="w-full" 
+                size="lg"
+                style={{
+                  backgroundColor: 'rgb(66, 133, 244)',
+                  color: 'rgb(255, 255, 255)',
+                  border: 'none'
+                }}
+              >
                 Iniciar Sesión
               </Button>
             </form>
 
             <div className="relative my-6">
               <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
+                <span className="w-full border-t" style={{ borderColor: 'rgb(221, 221, 221)' }} />
               </div>
               <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
+                <span className="px-2" style={{ backgroundColor: 'rgb(255, 255, 255)', color: 'rgb(102, 102, 102)' }}>
                   o continuar con
                 </span>
               </div>
@@ -140,6 +231,12 @@ const Login = () => {
               className="w-full"
               size="lg"
               onClick={handleGoogleLogin}
+              // disabled={loading}
+              style={{
+                backgroundColor: 'rgb(255, 255, 255)',
+                color: 'rgb(51, 51, 51)',
+                borderColor: 'rgb(221, 221, 221)'
+              }}
             >
               <svg className="mr-2 h-4 w-4" viewBox="0 0 24 24">
                 <path
@@ -164,11 +261,12 @@ const Login = () => {
           </CardContent>
 
           <CardFooter className="flex flex-col space-y-2">
-            <div className="text-sm text-center text-muted-foreground">
+            <div className="text-sm text-center" style={{ color: 'rgb(51, 51, 51)' }}>
               ¿No tienes cuenta?{" "}
               <Link
                 to="/register"
-                className="text-primary hover:underline font-medium"
+                className="hover:underline font-medium"
+                style={{ color: 'rgb(66, 133, 244)' }}
               >
                 Regístrate aquí
               </Link>
