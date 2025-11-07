@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import { log } from "console";
 
 interface NavItem {
   title: string;
@@ -33,8 +34,21 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
   const { profile, signOut } = useAuth();
 
   const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
+    console.log("[DashboardLayout] Logout clicked", {
+      currentPath: location.pathname,
+      profileId: profile?.id,
+    });
+
+    try {
+      console.log("[DashboardLayout] Calling signOut()");
+      await signOut();
+      console.log("[DashboardLayout] signOut() resolved, navigating to /login");
+      navigate("/login");
+      console.log();
+      
+    } catch (error) {
+      console.error("[DashboardLayout] signOut() failed", error);
+    }
   };
 
   const studentNav: NavItem[] = [
@@ -116,7 +130,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-sidebar-foreground truncate">
-                {profile ? `${profile.name} ${profile.last_name}` : 'Usuario'}
+                {profile ? `${profile.first_name} ${profile.last_name}` : 'Usuario'}
               </p>
               <p className="text-xs text-sidebar-foreground/60 truncate">
                 {profile?.email || 'usuario@ejemplo.com'}
