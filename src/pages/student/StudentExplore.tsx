@@ -48,7 +48,7 @@ const StudentExplore = () => {
 
       setAvailableCourses((data ?? []) as CourseWithProfessor[]);
       const courses = availableCourses
-      console.log(courses);
+      console.log(data);
       
 
     };
