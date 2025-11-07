@@ -1,146 +1,190 @@
+import React, { useState, useEffect } from "react";
 import DashboardLayout from "@/components/DashboardLayout";
 import {
   Card,
   CardContent,
-  CardDescription,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Search, Trash2, Eye, Users, Calendar, FileCheck } from "lucide-react";
+import { Search, Trash2, Eye, Users, Calendar, FileCheck, Plus, Loader2 } from "lucide-react";
+import { supabase } from "@/backend/supabase-client";
+
+interface Course {
+  id: number;
+  title: string;
+  description: string;
+  status: string;
+  max_students: number;
+  start_date: string;
+  end_date: string;
+  created_at: string;
+  professor_id: {
+    first_name: string;
+    last_name: string;
+  };
+  students_count?: number;
+  certificates_count?: number;
+}
 
 const AdminCourses = () => {
-  const courses = [
-    {
-      id: 1,
-      title: "Desarrollo Web Full Stack",
-      professor: "Dr. María González",
-      status: "Activo",
-      students: 45,
-      maxStudents: 50,
-      startDate: "15 Feb 2024",
-      certificates: 12,
-    },
-    {
-      id: 2,
-      title: "Machine Learning Avanzado",
-      professor: "Dr. Carlos Ruiz",
-      status: "Activo",
-      students: 32,
-      maxStudents: 40,
-      startDate: "10 Ene 2024",
-      certificates: 28,
-    },
-    {
-      id: 3,
-      title: "Cloud Computing Básico",
-      professor: "Ing. Roberto Sánchez",
-      status: "Finalizado",
-      students: 38,
-      maxStudents: 40,
-      startDate: "05 Dic 2023",
-      certificates: 35,
-    },
-  ];
+  const [courses, setCourses] = useState<Course[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+
+  useEffect(() => {
+    fetchCourses();
+  }, []);
+
+  const fetchCourses = async () => {
+    try {
+      setLoading(true);
+      
+      // First, get the count of students for each course
+      const { data: enrollmentsData } = await supabase
+        .from('enrollments')
+        .select('course_id, count')
+        .eq('status', 'active');
+
+      // Then, get the count of certificates for each course
+      const { data: certificatesData } = await supabase
+        .from('certificates')
+        .select('course_id, count')
+        .eq('status', 'approved');
+
+      // Now get all courses with professor information
+      const { data: coursesData, error } = await supabase
+        .from('courses')
+        .select(`
+          *,
+          professor_id (first_name, last_name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Combine the data
+      const coursesWithCounts = coursesData?.map(course => {
+        const studentCount = enrollmentsData
+          ?.find(e => e.course_id === course.id)?.count || 0;
+          
+        const certificateCount = certificatesData
+          ?.find(c => c.course_id === course.id)?.count || 0;
+
+        return {
+          ...course,
+          students_count: studentCount,
+          certificates_count: certificateCount
+        };
+      }) || [];
+
+      setCourses(coursesWithCounts);
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredCourses = courses.filter(course => 
+    course.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    course.professor_id.first_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    course.professor_id.last_name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   return (
     <DashboardLayout role="admin">
-      <div className="space-y-6 p-4 md:p-6">
-        <div className="space-y-2">
-          <h1 className="text-2xl md:text-3xl font-bold">Gestión de Cursos</h1>
-          <p className="text-muted-foreground text-sm md:text-base">
-            Administra y supervisa todos los cursos de la plataforma
+      <div className="space-y-6">
+        <div>
+          <h1 className="text-3xl font-bold">Gestión de Cursos</h1>
+          <p className="text-muted-foreground mt-2">
+            Administra y visualiza todos los cursos disponibles
           </p>
         </div>
-
-        {/* Search Bar */}
-        <div className="relative max-w-2xl">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 md:h-5 md:w-5 text-muted-foreground" />
-          <Input
-            placeholder="Buscar cursos por nombre o profesor..."
-            className="pl-9 h-10 md:h-12 text-sm md:text-base"
-          />
+        
+        <div className="flex justify-between items-center">
+          <div className="relative w-80">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Buscar cursos..."
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button>
+            <Plus className="mr-2 h-4 w-4" />
+            Nuevo Curso
+          </Button>
         </div>
-
-        {/* Courses List */}
-        <div className="space-y-4">
-          {courses.map((course) => (
-            <Card key={course.id} className="hover:shadow-md transition-shadow overflow-hidden">
-              <CardHeader className="pb-3">
-                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-                  <div className="space-y-1 flex-1">
-                    <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                      <CardTitle className="text-lg sm:text-xl line-clamp-2">{course.title}</CardTitle>
-                      <Badge
-                        variant={course.status === "Activo" ? "default" : "secondary"}
-                        className="w-fit"
-                      >
-                        {course.status}
-                      </Badge>
+        
+        {loading ? (
+          <div className="flex justify-center items-center h-64">
+            <Loader2 className="h-8 w-8 animate-spin" />
+          </div>
+        ) : (
+          <div className="grid gap-6">
+            {filteredCourses.length > 0 ? (
+              filteredCourses.map((course) => (
+                <Card key={course.id}>
+                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                    <CardTitle className="text-lg font-medium">
+                      {course.title}
+                    </CardTitle>
+                    <div className="flex space-x-2">
+                      <Button variant="ghost" size="icon">
+                        <Eye className="h-4 w-4" />
+                      </Button>
+                      <Button variant="ghost" size="icon">
+                        <Trash2 className="h-4 w-4 text-red-500" />
+                      </Button>
                     </div>
-                    <CardDescription>{course.professor}</CardDescription>
-                  </div>
-                  
-                  <div className="flex gap-2 sm:ml-4">
-                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none">
-                      <Eye className="h-4 w-4 mr-1.5 sm:mr-2" />
-                      <span className="sr-only sm:not-sr-only">Ver</span>
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1 sm:flex-none">
-                      <Trash2 className="h-4 w-4 mr-1.5 sm:mr-2" />
-                      <span className="sr-only sm:not-sr-only">Eliminar</span>
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-
-              <CardContent className="pt-0 pb-4">
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
-                    <Users className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    <div>
-                      <p className="text-muted-foreground text-xs">Estudiantes</p>
-                      <p className="font-medium">{course.students}/{course.maxStudents}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
-                    <Calendar className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    <div>
-                      <p className="text-muted-foreground text-xs">Inicio</p>
-                      <p className="font-medium">{course.startDate}</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
-                    <FileCheck className="h-4 w-4 flex-shrink-0 text-muted-foreground" />
-                    <div>
-                      <p className="text-muted-foreground text-xs">Certificados</p>
-                      <p className="font-medium">{course.certificates} emitidos</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/30">
-                    <div className="w-full">
-                      <p className="text-muted-foreground text-xs">Progreso</p>
-                      <div className="w-full bg-muted-foreground/20 rounded-full h-2 mt-1">
-                        <div 
-                          className="bg-primary h-2 rounded-full" 
-                          style={{ width: `${(course.students / course.maxStudents) * 100}%` }}
-                        />
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      Profesor: {course.professor_id.first_name} {course.professor_id.last_name}
+                    </p>
+                    <div className="mt-4 grid grid-cols-2 gap-4">
+                      <div className="flex items-center">
+                        <Users className="h-4 w-4 mr-2" />
+                        <span className="text-sm">
+                          {course.students_count} / {course.max_students} estudiantes
+                        </span>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        {Math.round((course.students / course.maxStudents) * 100)}% de capacidad
-                      </p>
+                      <div className="flex items-center">
+                        <Calendar className="h-4 w-4 mr-2" />
+                        <span className="text-sm">
+                          Inicia: {new Date(course.start_date + 'T00:00:00').toLocaleDateString('es-ES')}
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <FileCheck className="h-4 w-4 mr-2" />
+                        <span className="text-sm">
+                          {course.certificates_count} certificados emitidos
+                        </span>
+                      </div>
+                      <div>
+                        <Badge
+                          variant={course.status === "active" ? "default" : "secondary"}
+                          className="text-xs"
+                        >
+                          {course.status === "active" ? "Activo" : "Inactivo"}
+                        </Badge>
+                      </div>
                     </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  </CardContent>
+                </Card>
+              ))
+            ) : (
+              <div className="text-center py-12">
+                <p className="text-muted-foreground">No se encontraron cursos</p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </DashboardLayout>
   );

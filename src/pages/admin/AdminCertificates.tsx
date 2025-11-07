@@ -3,7 +3,7 @@ import { supabase } from "@/backend/supabase-client";
 import DashboardLayout from "@/components/DashboardLayout";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -18,72 +18,86 @@ type Certificate = {
   student_name: string;
   student_last_name: string;
   course_title: string;
-  issue_date: string;
+  issue_date: string | Date | null;
   status: "pending" | "approved" | "rejected";
-  verification_code: string;
+  readable_code: string;
 };
 
-type DatabaseCertificate = {
-  id: any;
-  verification_code: any;
-  status: any;
-  issue_date: any;
-  profiles: {
-    first_name: any;
-    last_name: any;
-  }[];
-  courses: {
-    title: any;
-  }[];
-  created_at: string;
-};
+// Simplified the DatabaseCertificate type since we're now using a more direct approach
 
 const AdminCertificates = () => {
   const [certificates, setCertificates] = useState<Certificate[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [verifying, setVerifying] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     fetchCertificates();
   }, []);
 
+  const handleCopyCode = (code: string) => {
+    navigator.clipboard.writeText(code);
+    console.log('Código copiado:', code);
+  };
+
   const fetchCertificates = async () => {
     try {
       setLoading(true);
+      
+      // First, let's get all columns to see what we're working with
+      const { data: tableInfo, error: tableError } = await supabase
+        .from('information_schema.columns')
+        .select('column_name')
+        .eq('table_name', 'certificates');
+      
+      console.log('Available columns in certificates table:', tableInfo?.map(col => col.column_name));
+      
+      // Try to fetch all columns to see the actual data structure
       const { data, error } = await supabase
-        .from("certificates")
-        .select(
-          `
-          id,
-          verification_code,
-          status,
-          issue_date,
-          profiles:student_id (first_name, last_name),
-          courses (title)
-        `
-        )
-        .order("created_at", { ascending: false });
+        .from('certificates')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1); // Just get one record to see the structure
 
+      console.log('Sample certificate data:', data);
+      
       if (error) throw error;
+      if (!data || data.length === 0) {
+        console.log('No certificates found');
+        setCertificates([]);
+        return;
+      }
 
-      const formattedCertificates = data.map((cert: DatabaseCertificate) => {
-        const profile = cert.profiles?.[0] || {
-          first_name: null,
-          last_name: null,
-        };
-        const course = cert.courses?.[0] || { title: null };
+      // Now fetch the actual data we need with the correct column names
+      const { data: certsData, error: fetchError } = await supabase
+        .from('certificates')
+        .select(`
+          *,
+          student_id (first_name, last_name),
+          course_id (title)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (fetchError) throw fetchError;
+
+      const formattedCertificates = certsData?.map((cert: any) => {
+        console.log('Processing certificate:', cert);
+        
+        // Get the readable_code from the certificate data
+        const verificationCode = cert.readable_code || 'N/A';
+        
+        const student = cert.student_id || { first_name: null, last_name: null };
+        const course = cert.course_id || { title: null };
 
         return {
           id: cert.id,
-          student_name: profile.first_name || "N/A",
-          student_last_name: profile.last_name || "N/A",
+          student_name: student.first_name || "N/A",
+          student_last_name: student.last_name || "N/A",
           course_title: course.title || "Curso no disponible",
-          issue_date: new Date(cert.issue_date).toLocaleDateString(),
+          issue_date: cert.issue_date ? new Date(cert.issue_date).toLocaleDateString() : "N/A",
           status: cert.status || "pending",
-          verification_code: cert.verification_code,
-        };
-      });
+          readable_code: verificationCode
+        } as Certificate;
+      }) || [];
 
       setCertificates(formattedCertificates);
     } catch (error) {
@@ -93,66 +107,13 @@ const AdminCertificates = () => {
     }
   };
 
-  const handleVerifyCertificate = async (
-    certificateId: string,
-    status: "approved" | "rejected"
-  ) => {
-    try {
-      setVerifying((prev) => ({ ...prev, [certificateId]: true }));
+  const filteredCertificates = certificates.filter(
+    (cert) =>
+      cert.student_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cert.course_title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      cert.readable_code.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
-      const { error } = await supabase
-        .from("certificates")
-        .update({ status })
-        .eq("id", certificateId);
-
-      if (error) throw error;
-
-      // Update local state
-      setCertificates((prev) =>
-        prev.map((cert) =>
-          cert.id === certificateId ? { ...cert, status } : cert
-        )
-      );
-    } catch (error) {
-      console.error("Error updating certificate status:", error);
-    } finally {
-      setVerifying((prev) => ({ ...prev, [certificateId]: false }));
-    }
-  };
-
-  const filteredCertificates = certificates.filter((cert) => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      cert.student_name.toLowerCase().includes(searchLower) ||
-      cert.student_last_name.toLowerCase().includes(searchLower) ||
-      cert.course_title.toLowerCase().includes(searchLower) ||
-      cert.verification_code.toLowerCase().includes(searchLower)
-    );
-  });
-
-  const getStatusBadge = (status: string) => {
-    const baseStyles = "px-2 py-1 rounded-full text-xs font-medium";
-    switch (status) {
-      case "approved":
-        return (
-          <span className={`${baseStyles} bg-green-100 text-green-800`}>
-            Aprobado
-          </span>
-        );
-      case "rejected":
-        return (
-          <span className={`${baseStyles} bg-red-100 text-red-800`}>
-            Rechazado
-          </span>
-        );
-      default:
-        return (
-          <span className={`${baseStyles} bg-yellow-100 text-yellow-800`}>
-            Pendiente
-          </span>
-        );
-    }
-  };
 
   return (
     <DashboardLayout role="admin">
@@ -188,8 +149,6 @@ const AdminCertificates = () => {
                   <TableHead>Curso</TableHead>
                   <TableHead>Código de Verificación</TableHead>
                   <TableHead>Fecha de Emisión</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -201,53 +160,18 @@ const AdminCertificates = () => {
                       </TableCell>
                       <TableCell>{cert.course_title}</TableCell>
                       <TableCell className="font-mono text-sm">
-                        {cert.verification_code}
+                        {cert.readable_code}
                       </TableCell>
-                      <TableCell>{cert.issue_date}</TableCell>
-                      <TableCell>{getStatusBadge(cert.status)}</TableCell>
-                      <TableCell className="text-right space-x-2">
-                        {cert.status !== "approved" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1 text-green-700 border-green-200 hover:bg-green-50"
-                            onClick={() =>
-                              handleVerifyCertificate(cert.id, "approved")
-                            }
-                            disabled={verifying[cert.id]}
-                          >
-                            {verifying[cert.id] ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <CheckCircle2 className="h-4 w-4 mr-1" />
-                            )}
-                            Aprobar
-                          </Button>
-                        )}
-                        {cert.status !== "rejected" && (
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            className="h-8 gap-1 text-red-700 border-red-200 hover:bg-red-50"
-                            onClick={() =>
-                              handleVerifyCertificate(cert.id, "rejected")
-                            }
-                            disabled={verifying[cert.id]}
-                          >
-                            {verifying[cert.id] ? (
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            ) : (
-                              <XCircle className="h-4 w-4 mr-1" />
-                            )}
-                            Rechazar
-                          </Button>
-                        )}
-                      </TableCell>
+                      <TableCell>{
+                        cert.issue_date 
+                          ? new Date(cert.issue_date + 'T00:00:00').toLocaleDateString('es-ES')
+                          : 'N/A'
+                      }</TableCell>
                     </TableRow>
                   ))
                 ) : (
                   <TableRow>
-                    <TableCell colSpan={6} className="h-24 text-center">
+                    <TableCell colSpan={5} className="h-24 text-center">
                       No se encontraron certificados
                     </TableCell>
                   </TableRow>
