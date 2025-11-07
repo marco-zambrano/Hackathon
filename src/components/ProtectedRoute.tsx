@@ -1,8 +1,3 @@
-// ProtectedRoute.tsx (Updated)
-// Simplified logic: Removed custom timeout as profile fetching is now optimized with caching in AuthContext.
-// Rely on the 'loading' state from AuthContext, which now includes profile query status.
-// This reduces unnecessary delays and complexity while still showing a loader during auth/profile resolution.
-
 import { Navigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 

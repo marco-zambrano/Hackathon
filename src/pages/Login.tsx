@@ -28,32 +28,45 @@ const Login = () => {
 
   // Redirect based on role
   const getUserRoleAndRedirect = useCallback(async (userId: string) => {
+    console.log('[getUserRoleAndRedirect] Iniciando con userId:', userId);
     try {
+      console.log('[getUserRoleAndRedirect] Consultando perfil en base de datos...');
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('role')
         .eq('id', userId)
         .single();
 
+      console.log('[getUserRoleAndRedirect] Respuesta de perfil:', { profile, error });
+
       if (error || !profile) {
+        console.error('[getUserRoleAndRedirect] Error o perfil no encontrado:', error);
         setError('No se encontró el perfil del usuario');
         return;
       }
 
+      console.log('[getUserRoleAndRedirect] Perfil encontrado, rol:', profile.role);
+      console.log('[getUserRoleAndRedirect] Navegando según rol...');
+
       switch (profile.role) {
         case 'ADMIN':
+          console.log('[getUserRoleAndRedirect] Redirigiendo a /admin/dashboard');
           navigate('/admin/dashboard');
           break;
         case 'STUDENT':
+          console.log('[getUserRoleAndRedirect] Redirigiendo a /student/explore');
           navigate('/student/explore');
           break;
         case 'PROFESSOR':
+          console.log('[getUserRoleAndRedirect] Redirigiendo a /professor/explore');
           navigate('/professor/explore');
           break;
         default:
+          console.warn('[getUserRoleAndRedirect] Rol no válido:', profile.role);
           setError('Rol de usuario no válido');
       }
     } catch (err) {
+      console.error('[getUserRoleAndRedirect] Excepción capturada:', err);
       setError('Error al procesar el inicio de sesión');
       console.error('Error fetching role:', err);
     }
@@ -61,15 +74,37 @@ const Login = () => {
 
   // Verificar si venimos de OAuth de Google (detecta el hash en la URL)
   useEffect(() => {
+    console.log('[useEffect] Registrando listener de cambios de autenticación...');
+    
+    // Verificar estado inicial de la sesión
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      console.log('[useEffect] Estado inicial de sesión:', { 
+        hasSession: !!session, 
+        userId: session?.user?.id,
+        error 
+      });
+    });
+
     const { data: subscription } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('[onAuthStateChange] Evento detectado:', event);
+        console.log('[onAuthStateChange] Sesión:', { 
+          hasSession: !!session, 
+          userId: session?.user?.id,
+          email: session?.user?.email 
+        });
+        
         if (event === "SIGNED_IN" && session?.user) {
+          console.log('[onAuthStateChange] Usuario firmado, llamando getUserRoleAndRedirect...');
           await getUserRoleAndRedirect(session.user.id);
+        } else {
+          console.log('[onAuthStateChange] Evento ignorado - no es SIGNED_IN o no hay sesión');
         }
       }
     );
   
     return () => {
+      console.log('[useEffect] Limpiando listener de autenticación...');
       subscription.subscription.unsubscribe();
     };
   }, [getUserRoleAndRedirect]);
@@ -77,37 +112,60 @@ const Login = () => {
   // handle submit
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('[handleSubmit] Iniciando proceso de login...');
+    console.log('[handleSubmit] Email:', email.trim());
+    console.log('[handleSubmit] Password length:', password.length);
+    
     setLoading(true);
     setError("");
 
     try {
       // First try to sign in with email/password directly
+      console.log('[handleSubmit] Llamando a signInWithPassword...');
       const { data, error: authError } = await supabase.auth.signInWithPassword({
         email: email.trim(),
         password,
       });
 
+      console.log('[handleSubmit] Respuesta de signInWithPassword:', {
+        hasData: !!data,
+        hasUser: !!data?.user,
+        userId: data?.user?.id,
+        userEmail: data?.user?.email,
+        hasError: !!authError,
+        error: authError
+      });
+
       if (authError) {
+        console.error('[handleSubmit] Error de autenticación:', authError);
         setError(
           authError.message.includes("Invalid login credentials")
             ? "Correo o contraseña incorrectos"
             : authError.message
         );
+        setLoading(false);
         return;
       }
 
       if (data.user) {
+        console.log('[handleSubmit] Usuario autenticado exitosamente, llamando getUserRoleAndRedirect...');
+        console.log('[handleSubmit] User ID:', data.user.id);
         await getUserRoleAndRedirect(data.user.id);
+        console.log('[handleSubmit] getUserRoleAndRedirect completado');
+      } else {
+        console.warn('[handleSubmit] No hay usuario en la respuesta de autenticación');
       }
     } catch (err) {
-      console.error("Error during email login", err);
+      console.error("[handleSubmit] Excepción capturada durante login:", err);
       setError("No se pudo completar el inicio de sesión. Inténtalo nuevamente.");
     } finally {
+      console.log('[handleSubmit] Finalizando handleSubmit, estableciendo loading=false');
       setLoading(false);
     }
   };
 
   const handleGoogleLogin = async () => {
+    console.log('[handleGoogleLogin] Iniciando login con Google...');
     setError("");
     setLoading(true);
 
@@ -118,11 +176,15 @@ const Login = () => {
       },
     });
 
+    console.log('[handleGoogleLogin] Respuesta de signInWithOAuth:', { error });
+
     if (error) {
+      console.error('[handleGoogleLogin] Error:', error);
       setError(error.message);
       setLoading(false);
       return;
     }
+    console.log('[handleGoogleLogin] Redirigiendo a Google OAuth...');
     setLoading(false);
   };
 

@@ -1,12 +1,3 @@
-// AuthContext.tsx (Updated)
-// Integrated Tanstack React Query for profile fetching to enable caching and reduce refetches on reload.
-// Moved profile fetch out of useEffect into a useQuery hook, which only runs when user?.id exists.
-// Adjusted 'loading' to account for both initial auth loading and profile query status.
-// This should significantly speed up reloads by using cached profile data (staleTime: 5min).
-// If the cache is stale, it will refetch in the background without blocking.
-// Removed redundant initialSessionProcessed flag as onAuthStateChange handles it properly.
-// Added error handling in useQuery to prevent silent failures.
-
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/backend/supabase-client';
