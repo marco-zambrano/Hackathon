@@ -21,6 +21,7 @@ import ProfessorCourses from "./pages/professor/ProfessorCourses";
 import ProfessorCertificates from "./pages/professor/ProfessorCertificates";
 import ProfessorProfile from "./pages/professor/ProfessorProfile";
 import ProfessorExplore from "./pages/professor/ProfessorExplore";
+import VerifyCertificate from "./pages/VerifyCertificate";
 
 const queryClient = new QueryClient();
 
@@ -35,9 +36,10 @@ const App = () => (
           {/* Landing - Accesible para todos */}
           <Route path="/" element={<Landing />} />
           
-          {/* Login y Register - Accesibles para todos */}
+          {/* Públicas - Accesibles para todos */}
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/verify" element={<VerifyCertificate />} />
           
           {/* Student Routes - Solo STUDENT */}
           <Route 

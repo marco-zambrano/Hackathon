@@ -83,6 +83,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
     { title: "Mis Cursos", href: "/student/courses", icon: BookOpen },
     { title: "Explorar Cursos", href: "/student/explore", icon: Search },
     { title: "Mis Certificados", href: "/student/certificates", icon: Award },
+    { title: "Verificar Certificado", href: "/verify-certificate", icon: Award },
     { title: "Perfil", href: "/student/profile", icon: User },
   ];
 
@@ -90,6 +91,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
     { title: "Mis Cursos", href: "/professor/courses", icon: BookOpen },
     { title: "Explorar Cursos", href: "/professor/explore", icon: Search },
     { title: "Mis Certificados", href: "/professor/certificates", icon: Award },
+    { title: "Verificar Certificado", href: "/verify-certificate", icon: Award },
     { title: "Solicitudes", href: "/professor/requests", icon: UserCheck },
     { title: "Perfil", href: "/professor/profile", icon: User },
   ];
@@ -98,6 +100,7 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
     { title: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard },
     { title: "Usuarios", href: "/admin/users", icon: Users },
     { title: "Cursos", href: "/admin/courses", icon: BookMarked },
+    { title: "Verificar Certificado", href: "/verify-certificate", icon: Award },
   ];
 
   const navItems =
@@ -187,6 +190,16 @@ const DashboardLayout = ({ children, role }: DashboardLayoutProps) => {
           >
             <LogOut className="h-4 w-4 mr-2" />
             Cerrar Sesión
+          </Button>
+          <Button 
+            asChild
+            variant="outline"
+            className="w-full justify-start text-sidebar-foreground/80 hover:text-sidebar-accent-foreground hover:bg-sidebar-accent/50 border-sidebar-border/50"
+          >
+            <Link to="/verify" target="_blank" rel="noopener noreferrer">
+              <Award className="h-4 w-4 mr-2" />
+              Verificar Certificado
+            </Link>
           </Button>
         </div>
       </aside>

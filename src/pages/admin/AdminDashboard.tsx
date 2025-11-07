@@ -220,38 +220,6 @@ const AdminDashboard = () => {
           ))}
         </div>
 
-        {/* Recent Activity */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Actividad Reciente</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {recentActivity.length > 0 ? (
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div
-                    key={activity.id}
-                    className="flex items-start justify-between border-b last:border-0 pb-4 last:pb-0"
-                  >
-                    <div className="space-y-1">
-                      <p className="font-medium">{activity.action}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {activity.details}
-                      </p>
-                    </div>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {activity.time}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className="text-center text-muted-foreground py-4">
-                No hay actividad reciente
-              </p>
-            )}
-          </CardContent>
-        </Card>
       </div>
     </DashboardLayout>
   );
