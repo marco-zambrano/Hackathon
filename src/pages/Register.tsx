@@ -12,7 +12,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { GraduationCap, Mail, Lock, AlertCircle, User } from "lucide-react";
+import { GraduationCap, Mail, Lock, AlertCircle } from "lucide-react";
+import { supabase } from "@/backend/supabase-client";
 
 const Register = () => {
   const [email, setEmail] = useState("");
@@ -20,7 +21,7 @@ const Register = () => {
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
@@ -30,6 +31,13 @@ const Register = () => {
     }
 
     // Register logic will be implemented later
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+    });
+    console.log(data);
+
+    error ? setError(error.message) : setError("");
   };
 
   return (
@@ -54,20 +62,6 @@ const Register = () => {
 
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre Completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="Juan Pérez"
-                    className="pl-10"
-                    required
-                  />
-                </div>
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="email">Correo Electrónico</Label>
                 <div className="relative">
